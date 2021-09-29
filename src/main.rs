@@ -13,6 +13,76 @@ use crossterm::event::{self, Event, KeyEvent, KeyCode};
 use std::time::Duration;
 use ndarray::prelude::*;
 
+struct State {
+    wave_cols: usize,
+    wave_rows: usize,
+    cur_wave_row: usize,
+    cur_wave_col: usize,
+    table_state: TableState,
+}
+
+impl State {
+    fn new() -> Self {
+        Self {
+            wave_cols: 1,
+            wave_rows: 1,
+            cur_wave_row: 0,
+            cur_wave_col: 0,
+            table_state: TableState::default(),
+        }
+    }
+
+    fn resize(&mut self, wave_width: u16, wave_height: u16) {
+        self.wave_cols = wave_width as usize;
+        self.wave_rows = wave_height as usize;
+    }
+
+    fn get_mut_table_state(&mut self) -> &mut TableState {
+        &mut self.table_state
+    }
+
+    fn get_cur_wave_col(&self) -> usize {
+        self.cur_wave_col
+    }
+
+    fn get_cur_wave_row(&self) -> usize {
+        self.cur_wave_row
+    }
+
+    fn move_cursor_left(&mut self) {
+        if self.cur_wave_col > 0 {
+            self.cur_wave_col -= 1;
+        }
+    }
+
+    fn move_cursor_right(&mut self) {
+        if self.cur_wave_col < self.wave_cols - 1 {
+            self.cur_wave_col += 1;
+        }
+    }
+
+    fn move_cursor_up(&mut self) {
+        if let Some(sel) = self.table_state.selected() {
+            if sel > 0 {
+                self.table_state.select(Some(sel-1));
+            }
+        } else {
+            self.table_state.select(Some(self.wave_rows - 1));
+        }
+    }
+
+    fn move_cursor_down(&mut self) {
+        if let Some(sel) = self.table_state.selected() {
+            if sel < self.wave_rows - 1 {
+                self.table_state.select(Some(sel+1));
+            }
+        } else {
+            self.table_state.select(Some(0));
+        }
+    }
+}
+
+
 fn format_bit(value: &u8) -> char {
     match value {
         0 => '▁',
@@ -23,7 +93,7 @@ fn format_bit(value: &u8) -> char {
 //fn format_vec(s: String, value: &u8) -> String {
 //}
 
-fn build_table<'a>(data : &'a Array2::<u8>, size: &'_ Rect, cur_cycle: usize) -> Table<'a> {
+fn build_table<'a>(data : &'a Array2::<u8>, size: &'_ Rect, state: &State) -> Table<'a> {
     let even_style = Style::default()
         .fg(Color::Black)
         .bg(Color::White);
@@ -44,6 +114,7 @@ fn build_table<'a>(data : &'a Array2::<u8>, size: &'_ Rect, cur_cycle: usize) ->
     let num_signals = std::cmp::min((size.height - 2) as usize, num_signals);
 
     for row_i in 0..num_signals {
+        let cur_cycle = state.get_cur_wave_col();
         let s_pre: String = data.slice(s![..cur_cycle, row_i]).iter()
             .map(format_bit)
             .take(size.width as usize)
@@ -103,45 +174,15 @@ fn main() -> Result<(),io::Error> {
         data
     };
 
-    let mut table_state = TableState::default();
-    let mut cursor_cycle = 0;
+    let mut state = State::new();
 
     loop {
         terminal.draw(|f| {
             let size = f.size();
-            //let chunks = Layout::default()
-                //.direction(Direction::Horizontal)
-                //.margin(1)
-                //.constraints(
-                    //[
-                        //Constraint::Percentage(20),
-                        //Constraint::Percentage(80)
-                    //].as_ref()
-                //)
-                //.split(f.size());
+            state.resize(size.width - 48, size.height - 2);
+            let table = build_table(&data, &size, &state);
 
-            //let block = Block::default()
-                //.title("Block")
-                //.borders(Borders::ALL);
-            //f.render_widget(block, chunks[0]);
-
-            //let block2 = Block::default()
-                //.title("Block 2")
-                //.borders(Borders::ALL);
-            //f.render_widget(block2, chunks[1]);
-
-            //let table = Table::new(vec![
-                    //Row::new(vec!["clk", "0", "▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇▁▇"]),
-                    //Row::new(vec!["foo", "1", "▁▁▁▁▁▁▁▁▁▁▇▇▇▇▇▇▇▇▇▇▇▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁"]),
-                    //Row::new(vec!["bar", "1", "000╳001╳010╳011╳100╳101╳110╳111╳000╳001╳00"]),
-                //])
-                //.header(Row::new(vec!["Name", "Value", "Waveform"])
-                    //.style(Style::default().fg(Color::Yellow))
-                    //.bottom_margin(1))
-                //.widths(&[Constraint::Percentage(20), Constraint::Percentage(10), Constraint::Percentage(70)]);
-            let table = build_table(&data, &size, cursor_cycle);
-
-            f.render_stateful_widget(table, size, &mut table_state);
+            f.render_stateful_widget(table, size, state.get_mut_table_state());
 
         })?;
 
@@ -156,38 +197,22 @@ fn main() -> Result<(),io::Error> {
 
                 // down
                 Event::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
-                    if let Some(sel) = table_state.selected() {
-                        if sel < data.dim().1 -1 {
-                            table_state.select(Some(sel+1));
-                        }
-                    } else {
-                        table_state.select(Some(0));
-                    }
+                    state.move_cursor_down();
                 }
 
                 // up
                 Event::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
-                    if let Some(sel) = table_state.selected() {
-                        if sel > 0 {
-                            table_state.select(Some(sel-1));
-                        }
-                    } else {
-                        table_state.select(Some(data.dim().1-1));
-                    }
+                    state.move_cursor_up();
                 }
                 
                 // left
                 Event::Key(KeyEvent { code: KeyCode::Char('h'), .. }) => {
-                    if cursor_cycle > 0 {
-                        cursor_cycle -= 1;
-                    }
+                    state.move_cursor_left();
                 }
 
                 // right
                 Event::Key(KeyEvent { code: KeyCode::Char('l'), .. }) => {
-                    if cursor_cycle < data.dim().0 {
-                        cursor_cycle += 1;
-                    }
+                    state.move_cursor_right();
                 }
                 _ => {}
             }
