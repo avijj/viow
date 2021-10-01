@@ -2,7 +2,7 @@ use std::io;
 use tui::Terminal;
 use tui::backend::CrosstermBackend;
 use tui::widgets::{
-    Widget, Block, Borders, Table, TableState, Row, Cell
+    Widget, Block, Borders, Table, TableState, Row, Cell, Paragraph
 };
 use tui::layout::{
     Layout, Constraint, Direction, Rect
@@ -13,11 +13,33 @@ use crossterm::event::{self, Event, KeyEvent, KeyCode};
 use std::time::Duration;
 use ndarray::prelude::*;
 
+
 struct State {
+    /// Visible cols in waveform view
     wave_cols: usize,
+
+    /// Visible rows in waveform view
     wave_rows: usize,
+
+    /// Total number of columns in data
+    data_cols: usize,
+
+    /// Total number of rows in data
+    data_rows: usize,
+
+    /// Top row in data matching row 0 in waveform view
+    top_wave_row: usize,
+
+    /// Leftmost column in data matching col 0 in waveform view
+    left_wave_col: usize,
+
+    /// Row where cursor is
     cur_wave_row: usize,
+
+    /// Column where cursor is
     cur_wave_col: usize,
+
+    /// State of the Table widget
     table_state: TableState,
 }
 
@@ -26,6 +48,10 @@ impl State {
         Self {
             wave_cols: 1,
             wave_rows: 1,
+            data_cols: 0,
+            data_rows: 0,
+            top_wave_row: 0,
+            left_wave_col: 0,
             cur_wave_row: 0,
             cur_wave_col: 0,
             table_state: TableState::default(),
@@ -35,6 +61,11 @@ impl State {
     fn resize(&mut self, wave_width: u16, wave_height: u16) {
         self.wave_cols = wave_width as usize;
         self.wave_rows = wave_height as usize;
+    }
+
+    fn data_size(&mut self, rows: usize, cols: usize) {
+        self.data_rows = rows;
+        self.data_cols = cols;
     }
 
     fn get_mut_table_state(&mut self) -> &mut TableState {
@@ -51,12 +82,18 @@ impl State {
 
     fn move_cursor_left(&mut self) {
         if self.cur_wave_col > 0 {
+            if self.cur_wave_col == self.left_wave_col {
+                self.left_wave_col -= 1;
+            }
             self.cur_wave_col -= 1;
         }
     }
 
     fn move_cursor_right(&mut self) {
-        if self.cur_wave_col < self.wave_cols - 1 {
+        if self.cur_wave_col < self.data_cols - 1 {
+            if self.cur_wave_col == self.left_wave_col + self.wave_cols - 1 {
+                self.left_wave_col += 1;
+            }
             self.cur_wave_col += 1;
         }
     }
@@ -65,9 +102,15 @@ impl State {
         if let Some(sel) = self.table_state.selected() {
             if sel > 0 {
                 self.table_state.select(Some(sel-1));
+                self.cur_wave_row -= 1;
+            } else if self.cur_wave_row > 0 {
+                self.top_wave_row -= 1;
+                self.cur_wave_row -= 1;
             }
         } else {
             self.table_state.select(Some(self.wave_rows - 1));
+            self.cur_wave_row = self.data_rows - 1;
+            self.top_wave_row = self.data_rows - self.wave_rows;
         }
     }
 
@@ -75,9 +118,15 @@ impl State {
         if let Some(sel) = self.table_state.selected() {
             if sel < self.wave_rows - 1 {
                 self.table_state.select(Some(sel+1));
+                self.cur_wave_row += 1;
+            } else if self.cur_wave_row < self.data_rows - 1 {
+                self.top_wave_row += 1;
+                self.cur_wave_row += 1;
             }
         } else {
             self.table_state.select(Some(0));
+            self.top_wave_row = 0;
+            self.cur_wave_row = 0;
         }
     }
 }
@@ -108,14 +157,16 @@ fn build_table<'a>(data : &'a Array2::<u8>, size: &'_ Rect, state: &State) -> Ta
         .add_modifier(Modifier::BOLD);
 
 
-    let (_num_cycles, num_signals) = data.dim();
-    let mut rows = Vec::with_capacity(num_signals);
+    let mut rows = Vec::with_capacity(state.wave_rows);
 
-    let num_signals = std::cmp::min((size.height - 2) as usize, num_signals);
+    let top = state.top_wave_row;
+    let bot = state.top_wave_row + state.wave_rows;
+    let left = state.left_wave_col;
+    let right = state.left_wave_col + state.wave_cols;
 
-    for row_i in 0..num_signals {
-        let cur_cycle = state.get_cur_wave_col();
-        let s_pre: String = data.slice(s![..cur_cycle, row_i]).iter()
+    for row_i in top..bot {
+        let cur_cycle = state.cur_wave_col;
+        let s_pre: String = data.slice(s![left..cur_cycle, row_i]).iter()
             .map(format_bit)
             .take(size.width as usize)
             .collect();
@@ -123,7 +174,7 @@ fn build_table<'a>(data : &'a Array2::<u8>, size: &'_ Rect, state: &State) -> Ta
             .map(format_bit)
             .take(size.width as usize)
             .collect();
-        let s_post: String = data.slice(s![cur_cycle+1.., row_i]).iter()
+        let s_post: String = data.slice(s![cur_cycle+1..right, row_i]).iter()
             .map(format_bit)
             .take(size.width as usize)
             .collect();
@@ -153,6 +204,16 @@ fn build_table<'a>(data : &'a Array2::<u8>, size: &'_ Rect, state: &State) -> Ta
         .highlight_style(hi_style)
 }
 
+fn build_statusline(state: &State) -> Paragraph {
+    let line_txt = vec![
+        Spans::from(vec![
+            Span::raw(format!("Cursor: {},{}", state.cur_wave_row, state.cur_wave_col))
+        ])
+    ];
+
+    Paragraph::new(line_txt)
+}
+
 fn main() -> Result<(),io::Error> {
     crossterm::terminal::enable_raw_mode()
         .expect("Can't run in raw mode");
@@ -179,11 +240,23 @@ fn main() -> Result<(),io::Error> {
     loop {
         terminal.draw(|f| {
             let size = f.size();
-            state.resize(size.width - 48, size.height - 2);
-            let table = build_table(&data, &size, &state);
+            let stack = Layout::default()
+                .direction(Direction::Vertical)
+                .margin(0)
+                .constraints([
+                    Constraint::Min(1),
+                    Constraint::Length(1)
+                ])
+                .split(size);
+
+            state.resize(stack[0].width - 48, stack[0].height - 2);
+            state.data_size(data.dim().1, data.dim().0);
+            let table = build_table(&data, &stack[0], &state);
 
             f.render_stateful_widget(table, size, state.get_mut_table_state());
 
+            let statusline = build_statusline(&state);
+            f.render_widget(statusline, stack[1]);
         })?;
 
         // check events
