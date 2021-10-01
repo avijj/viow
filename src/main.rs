@@ -12,6 +12,7 @@ use tui::text::{Spans, Span};
 use crossterm::event::{self, Event, KeyEvent, KeyCode};
 use std::time::Duration;
 use ndarray::prelude::*;
+use rug::Integer;
 
 
 struct State {
@@ -132,29 +133,39 @@ impl State {
 }
 
 
-fn format_bit(value: &u8) -> char {
-    match value {
-        0 => '▁',
-        _ => '▇',
+fn format_bit(value: &Integer) -> char {
+    if *value == 0 {
+        '▁'
+    } else {
+        '▇'
     }
 }
 
-#[derive(Default)]
 struct FormatAcc {
-    last: Option<u8>,
+    last: Option<Integer>,
     cnt: usize,
     msg: String,
 }
 
-fn format_vec(mut acc: FormatAcc, value: &u8) -> FormatAcc {
+impl FormatAcc {
+    fn new() -> Self {
+        Self {
+            last: None,
+            cnt: 0,
+            msg: String::from("")
+        }
+    }
+}
+
+fn format_vec(mut acc: FormatAcc, value: &Integer) -> FormatAcc {
     let emit;
 
-    let val = format!("{:02x}", *value);
+    let val = format!("{:x}", *value);
+    let val_len = val.chars().count();
 
     if let Some(last) = acc.last {
         if last == *value {
-
-            if acc.cnt >= val.chars().count() {
+            if acc.cnt >= val_len {
                 emit = ' ';
             } else {
                 emit = val.chars().nth(acc.cnt).unwrap();
@@ -162,6 +173,10 @@ fn format_vec(mut acc: FormatAcc, value: &u8) -> FormatAcc {
 
             acc.cnt += 1;
         } else {
+            if (acc.cnt < val_len) && (acc.cnt > 0) {
+                acc.msg.pop();
+                acc.msg.push('…');
+            }
             acc.cnt = 0;
             emit = '╳';
         }
@@ -169,7 +184,7 @@ fn format_vec(mut acc: FormatAcc, value: &u8) -> FormatAcc {
         emit = '╳';
     }
 
-    acc.last = Some(*value);
+    acc.last = Some(value.clone());
     acc.msg.push(emit);
 
     acc
@@ -183,16 +198,16 @@ enum WaveFormat {
 
 fn build_waveform_vec<'a, T>(line_data: T) -> String 
     where
-        T: Iterator<Item = &'a u8>
+        T: Iterator<Item = &'a Integer>
 {
     line_data
-        .fold(FormatAcc::default(), format_vec)
+        .fold(FormatAcc::new(), format_vec)
         .msg
 }
 
 fn build_waveform_bit<'a, T>(line_data: T) -> String 
     where
-        T: Iterator<Item = &'a u8>
+        T: Iterator<Item = &'a Integer>
 {
     line_data
         .map(format_bit)
@@ -201,7 +216,7 @@ fn build_waveform_bit<'a, T>(line_data: T) -> String
 
 fn build_waveform<'a, T>(line_data: T, format: WaveFormat) -> String 
     where
-        T: Iterator<Item = &'a u8>
+        T: Iterator<Item = &'a Integer>
 {
     match format {
         WaveFormat::Bit => build_waveform_bit(line_data),
@@ -211,7 +226,7 @@ fn build_waveform<'a, T>(line_data: T, format: WaveFormat) -> String
 
 
 
-fn build_table<'a>(data : &'a Array2::<u8>, formatters: &Vec<WaveFormat>, size: &'_ Rect, state: &State) -> Table<'a> {
+fn build_table<'a>(data : &'a Array2::<Integer>, formatters: &Vec<WaveFormat>, size: &'_ Rect, state: &State) -> Table<'a> {
     let even_style = Style::default()
         .fg(Color::Black)
         .bg(Color::White);
@@ -244,7 +259,7 @@ fn build_table<'a>(data : &'a Array2::<u8>, formatters: &Vec<WaveFormat>, size: 
 
         let name_cell = Cell::from(format!("row_{}", row_i))
             .style(*cur_style);
-        let value_cell = Cell::from(format!("{}", data[[cur_cycle, row_i]]))
+        let value_cell = Cell::from(format!("0x{:>8x}", data[[cur_cycle, row_i]]))
             .style(*cur_style);
         let wave_cell = Cell::from(Spans::from(vec![
                 Span::raw(s_pre),
@@ -260,7 +275,7 @@ fn build_table<'a>(data : &'a Array2::<u8>, formatters: &Vec<WaveFormat>, size: 
         .header(Row::new(vec!["Name", "Value", "Waveform"])
             .style(Style::default().fg(Color::Yellow))
             .bottom_margin(0))
-        .widths(&[Constraint::Min(40), Constraint::Length(8), Constraint::Ratio(1, 1)])
+        .widths(&[Constraint::Min(37), Constraint::Length(11), Constraint::Ratio(1, 1)])
         .column_spacing(0)
         .highlight_style(hi_style)
 }
@@ -285,15 +300,24 @@ fn main() -> Result<(),io::Error> {
     terminal.clear()?;
 
     let (data, formatters) = {
-        let mut data = Array2::<u8>::zeros((1000, 200));
+        //let mut data = vec![vec![Integer::from(0); 200]];
+        //let mut data = Array2::<Integer>::zeros((1000, 200));
+        let mut data = Array2::<Integer>::from_elem((1000, 200), Integer::from(0));
         let mut formatters = vec![WaveFormat::Bit; 200];
-        data.slice_mut(s![..,1]).fill(1);
-        data.slice_mut(s![..;2,2]).fill(1);
-        let counter: Vec<u8> = (0..data.dim().0).into_iter()
-            .map(|x: usize| ((x >> 2) % 16) as u8)
+        data.slice_mut(s![..,1]).fill(Integer::from(1));
+        data.slice_mut(s![..;2,2]).fill(Integer::from(1));
+
+        let counter: Vec<Integer> = (0..data.dim().0).into_iter()
+            .map(|x: usize| Integer::from((x >> 2) % 16))
             .collect();
         data.slice_mut(s![..,4]).assign(&Array1::from_vec(counter));
         formatters[4] = WaveFormat::Vector;
+
+        let counter: Vec<Integer> = (0x4000..data.dim().0 + 0x4000).into_iter()
+            .map(|x: usize| Integer::from((x >> 2) % 0x10000))
+            .collect();
+        data.slice_mut(s![..,5]).assign(&Array1::from_vec(counter));
+        formatters[5] = WaveFormat::Vector;
 
         (data, formatters)
     };
