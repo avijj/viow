@@ -139,10 +139,79 @@ fn format_bit(value: &u8) -> char {
     }
 }
 
-//fn format_vec(s: String, value: &u8) -> String {
-//}
+#[derive(Default)]
+struct FormatAcc {
+    last: Option<u8>,
+    cnt: usize,
+    msg: String,
+}
 
-fn build_table<'a>(data : &'a Array2::<u8>, size: &'_ Rect, state: &State) -> Table<'a> {
+fn format_vec(mut acc: FormatAcc, value: &u8) -> FormatAcc {
+    let emit;
+
+    let val = format!("{:02x}", *value);
+
+    if let Some(last) = acc.last {
+        if last == *value {
+
+            if acc.cnt >= val.chars().count() {
+                emit = ' ';
+            } else {
+                emit = val.chars().nth(acc.cnt).unwrap();
+            }
+
+            acc.cnt += 1;
+        } else {
+            acc.cnt = 0;
+            emit = '╳';
+        }
+    } else {
+        emit = '╳';
+    }
+
+    acc.last = Some(*value);
+    acc.msg.push(emit);
+
+    acc
+}
+
+#[derive(Clone,Copy)]
+enum WaveFormat {
+    Bit,
+    Vector,
+}
+
+fn build_waveform_vec<'a, T>(line_data: T) -> String 
+    where
+        T: Iterator<Item = &'a u8>
+{
+    line_data
+        .fold(FormatAcc::default(), format_vec)
+        .msg
+}
+
+fn build_waveform_bit<'a, T>(line_data: T) -> String 
+    where
+        T: Iterator<Item = &'a u8>
+{
+    line_data
+        .map(format_bit)
+        .collect()
+}
+
+fn build_waveform<'a, T>(line_data: T, format: WaveFormat) -> String 
+    where
+        T: Iterator<Item = &'a u8>
+{
+    match format {
+        WaveFormat::Bit => build_waveform_bit(line_data),
+        WaveFormat::Vector => build_waveform_vec(line_data),
+    }
+}
+
+
+
+fn build_table<'a>(data : &'a Array2::<u8>, formatters: &Vec<WaveFormat>, size: &'_ Rect, state: &State) -> Table<'a> {
     let even_style = Style::default()
         .fg(Color::Black)
         .bg(Color::White);
@@ -165,19 +234,11 @@ fn build_table<'a>(data : &'a Array2::<u8>, size: &'_ Rect, state: &State) -> Ta
     let right = state.left_wave_col + state.wave_cols;
 
     for row_i in top..bot {
-        let cur_cycle = state.cur_wave_col;
-        let s_pre: String = data.slice(s![left..cur_cycle, row_i]).iter()
-            .map(format_bit)
-            .take(size.width as usize)
-            .collect();
-        let s_cur: String = data.slice(s![cur_cycle, row_i]).iter()
-            .map(format_bit)
-            .take(size.width as usize)
-            .collect();
-        let s_post: String = data.slice(s![cur_cycle+1..right, row_i]).iter()
-            .map(format_bit)
-            .take(size.width as usize)
-            .collect();
+        let fmt = build_waveform(data.slice(s![left..right, row_i]).iter(), formatters[row_i]);
+        let cur_cycle = state.cur_wave_col - state.left_wave_col;
+        let s_pre: String = fmt.chars().take(cur_cycle).collect();
+        let s_cur: String = fmt.chars().skip(cur_cycle).take(1).collect();
+        let s_post: String = fmt.chars().skip(cur_cycle+1).collect();
 
         let ref cur_style = if row_i % 2 == 0 { even_style } else { odd_style };
 
@@ -223,16 +284,18 @@ fn main() -> Result<(),io::Error> {
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
-    let data = {
+    let (data, formatters) = {
         let mut data = Array2::<u8>::zeros((1000, 200));
+        let mut formatters = vec![WaveFormat::Bit; 200];
         data.slice_mut(s![..,1]).fill(1);
         data.slice_mut(s![..;2,2]).fill(1);
         let counter: Vec<u8> = (0..data.dim().0).into_iter()
             .map(|x: usize| ((x >> 2) % 16) as u8)
             .collect();
         data.slice_mut(s![..,4]).assign(&Array1::from_vec(counter));
+        formatters[4] = WaveFormat::Vector;
 
-        data
+        (data, formatters)
     };
 
     let mut state = State::new();
@@ -251,7 +314,7 @@ fn main() -> Result<(),io::Error> {
 
             state.resize(stack[0].width - 48, stack[0].height - 2);
             state.data_size(data.dim().1, data.dim().0);
-            let table = build_table(&data, &stack[0], &state);
+            let table = build_table(&data, &formatters, &stack[0], &state);
 
             f.render_stateful_widget(table, size, state.get_mut_table_state());
 
