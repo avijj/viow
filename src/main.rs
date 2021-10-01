@@ -9,7 +9,7 @@ use tui::layout::{
 };
 use tui::style::{Style, Color, Modifier};
 use tui::text::{Spans, Span};
-use crossterm::event::{self, Event, KeyEvent, KeyCode};
+use crossterm::event::{self, Event, KeyEvent, KeyCode, KeyModifiers};
 use std::time::Duration;
 use ndarray::prelude::*;
 use rug::Integer;
@@ -42,6 +42,9 @@ struct State {
 
     /// State of the Table widget
     table_state: TableState,
+
+    /// Number of columns in view for a data column
+    zoom: usize,
 }
 
 impl State {
@@ -56,11 +59,12 @@ impl State {
             cur_wave_row: 0,
             cur_wave_col: 0,
             table_state: TableState::default(),
+            zoom: 1,
         }
     }
 
     fn resize(&mut self, wave_width: u16, wave_height: u16) {
-        self.wave_cols = wave_width as usize;
+        self.wave_cols = wave_width as usize / self.zoom;
         self.wave_rows = wave_height as usize;
     }
 
@@ -130,6 +134,50 @@ impl State {
             self.cur_wave_row = 0;
         }
     }
+
+    fn move_page_down(&mut self) {
+        if self.top_wave_row < self.data_rows - 1 {
+            let inc = std::cmp::min(self.data_rows - self.top_wave_row - self.wave_rows, self.wave_rows);
+            self.top_wave_row += inc;
+            self.cur_wave_row = self.top_wave_row;
+            self.table_state.select(Some(0));
+        }
+    }
+
+    fn move_page_up(&mut self) {
+        if self.top_wave_row > 0 {
+            let dec = std::cmp::min(self.top_wave_row, self.wave_rows);
+            self.top_wave_row -= dec;
+            self.cur_wave_row = self.top_wave_row + self.wave_rows - 1;
+            self.table_state.select(Some(self.wave_rows - 1));
+        }
+    }
+
+    fn move_page_right(&mut self) {
+        if self.left_wave_col < self.data_cols - 1 {
+            let inc = std::cmp::min(self.data_cols - self.left_wave_col - self.wave_cols, self.wave_cols);
+            self.left_wave_col += inc;
+            self.cur_wave_col = self.left_wave_col;
+        }
+    }
+
+    fn move_page_left(&mut self) {
+        if self.left_wave_col > 0 {
+            let dec = std::cmp::min(self.left_wave_col, self.wave_cols);
+            self.left_wave_col -= dec;
+            self.cur_wave_col = self.left_wave_col + self.wave_cols - 1;
+        }
+    }
+
+    fn zoom_in(&mut self) {
+        self.zoom += 1;
+    }
+
+    fn zoom_out(&mut self) {
+        if self.zoom > 1 {
+            self.zoom -= 1;
+        }
+    }
 }
 
 
@@ -196,37 +244,41 @@ enum WaveFormat {
     Vector,
 }
 
-fn build_waveform_vec<'a, T>(line_data: T) -> String 
+fn build_waveform_vec<'a, T>(line_data: T, zoom: usize) -> String 
     where
         T: Iterator<Item = &'a Integer>
 {
     line_data
+        .map(|x| core::iter::repeat(x).take(zoom))
+        .flatten()
         .fold(FormatAcc::new(), format_vec)
         .msg
 }
 
-fn build_waveform_bit<'a, T>(line_data: T) -> String 
+fn build_waveform_bit<'a, T>(line_data: T, zoom: usize) -> String 
     where
         T: Iterator<Item = &'a Integer>
 {
     line_data
+        .map(|x| core::iter::repeat(x).take(zoom))
+        .flatten()
         .map(format_bit)
         .collect()
 }
 
-fn build_waveform<'a, T>(line_data: T, format: WaveFormat) -> String 
+fn build_waveform<'a, T>(line_data: T, format: WaveFormat, zoom: usize) -> String 
     where
         T: Iterator<Item = &'a Integer>
 {
     match format {
-        WaveFormat::Bit => build_waveform_bit(line_data),
-        WaveFormat::Vector => build_waveform_vec(line_data),
+        WaveFormat::Bit => build_waveform_bit(line_data, zoom),
+        WaveFormat::Vector => build_waveform_vec(line_data, zoom),
     }
 }
 
 
 
-fn build_table<'a>(data : &'a Array2::<Integer>, formatters: &Vec<WaveFormat>, size: &'_ Rect, state: &State) -> Table<'a> {
+fn build_table<'a>(data : &'a Array2::<Integer>, formatters: &Vec<WaveFormat>, state: &State) -> Table<'a> {
     let even_style = Style::default()
         .fg(Color::Black)
         .bg(Color::White);
@@ -249,11 +301,11 @@ fn build_table<'a>(data : &'a Array2::<Integer>, formatters: &Vec<WaveFormat>, s
     let right = state.left_wave_col + state.wave_cols;
 
     for row_i in top..bot {
-        let fmt = build_waveform(data.slice(s![left..right, row_i]).iter(), formatters[row_i]);
-        let cur_cycle = state.cur_wave_col - state.left_wave_col;
+        let fmt = build_waveform(data.slice(s![left..right, row_i]).iter(), formatters[row_i], state.zoom);
+        let cur_cycle = (state.cur_wave_col - state.left_wave_col) * state.zoom;
         let s_pre: String = fmt.chars().take(cur_cycle).collect();
-        let s_cur: String = fmt.chars().skip(cur_cycle).take(1).collect();
-        let s_post: String = fmt.chars().skip(cur_cycle+1).collect();
+        let s_cur: String = fmt.chars().skip(cur_cycle).take(state.zoom).collect();
+        let s_post: String = fmt.chars().skip(cur_cycle+state.zoom).collect();
 
         let ref cur_style = if row_i % 2 == 0 { even_style } else { odd_style };
 
@@ -338,7 +390,7 @@ fn main() -> Result<(),io::Error> {
 
             state.resize(stack[0].width - 48, stack[0].height - 2);
             state.data_size(data.dim().1, data.dim().0);
-            let table = build_table(&data, &formatters, &stack[0], &state);
+            let table = build_table(&data, &formatters, &state);
 
             f.render_stateful_widget(table, size, state.get_mut_table_state());
 
@@ -360,9 +412,19 @@ fn main() -> Result<(),io::Error> {
                     state.move_cursor_down();
                 }
 
+                // page down
+                Event::Key(KeyEvent { code: KeyCode::Char('J'), .. }) => {
+                    state.move_page_down();
+                }
+
                 // up
                 Event::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
                     state.move_cursor_up();
+                }
+                
+                // page up
+                Event::Key(KeyEvent { code: KeyCode::Char('K'), .. }) => {
+                    state.move_page_up();
                 }
                 
                 // left
@@ -370,10 +432,31 @@ fn main() -> Result<(),io::Error> {
                     state.move_cursor_left();
                 }
 
+                // page left
+                Event::Key(KeyEvent { code: KeyCode::Char('H'), .. }) => {
+                    state.move_page_left();
+                }
+
                 // right
                 Event::Key(KeyEvent { code: KeyCode::Char('l'), .. }) => {
                     state.move_cursor_right();
                 }
+
+                // page right
+                Event::Key(KeyEvent { code: KeyCode::Char('L'), .. }) => {
+                    state.move_page_right();
+                }
+
+                // zoom in '+'
+                Event::Key(KeyEvent { code: KeyCode::Char('+'), .. }) => {
+                    state.zoom_in();
+                }
+
+                // zoom out '-'
+                Event::Key(KeyEvent { code: KeyCode::Char('-'), .. }) => {
+                    state.zoom_out();
+                }
+
                 _ => {}
             }
         }
