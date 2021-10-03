@@ -1,18 +1,26 @@
+mod wave;
+mod formatting;
+
+use wave::Wave;
+use formatting::build_waveform;
+
 use std::io;
 use tui::Terminal;
 use tui::backend::CrosstermBackend;
 use tui::widgets::{
-    Widget, Block, Borders, Table, TableState, Row, Cell, Paragraph
+    Table, TableState, Row, Cell, Paragraph
 };
 use tui::layout::{
-    Layout, Constraint, Direction, Rect
+    Layout, Constraint, Direction 
 };
 use tui::style::{Style, Color, Modifier};
 use tui::text::{Spans, Span};
-use crossterm::event::{self, Event, KeyEvent, KeyCode, KeyModifiers};
+use crossterm::{
+    ExecutableCommand,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
+    event::{self, Event, KeyEvent, KeyCode}
+};
 use std::time::Duration;
-use ndarray::prelude::*;
-use rug::Integer;
 
 
 struct State {
@@ -77,13 +85,13 @@ impl State {
         &mut self.table_state
     }
 
-    fn get_cur_wave_col(&self) -> usize {
-        self.cur_wave_col
-    }
+    //fn get_cur_wave_col(&self) -> usize {
+        //self.cur_wave_col
+    //}
 
-    fn get_cur_wave_row(&self) -> usize {
-        self.cur_wave_row
-    }
+    //fn get_cur_wave_row(&self) -> usize {
+        //self.cur_wave_row
+    //}
 
     fn move_cursor_left(&mut self) {
         if self.cur_wave_col > 0 {
@@ -181,104 +189,8 @@ impl State {
 }
 
 
-fn format_bit(value: &Integer) -> char {
-    if *value == 0 {
-        '▁'
-    } else {
-        '▇'
-    }
-}
 
-struct FormatAcc {
-    last: Option<Integer>,
-    cnt: usize,
-    msg: String,
-}
-
-impl FormatAcc {
-    fn new() -> Self {
-        Self {
-            last: None,
-            cnt: 0,
-            msg: String::from("")
-        }
-    }
-}
-
-fn format_vec(mut acc: FormatAcc, value: &Integer) -> FormatAcc {
-    let emit;
-
-    let val = format!("{:x}", *value);
-    let val_len = val.chars().count();
-
-    if let Some(last) = acc.last {
-        if last == *value {
-            if acc.cnt >= val_len {
-                emit = ' ';
-            } else {
-                emit = val.chars().nth(acc.cnt).unwrap();
-            }
-
-            acc.cnt += 1;
-        } else {
-            if (acc.cnt < val_len) && (acc.cnt > 0) {
-                acc.msg.pop();
-                acc.msg.push('…');
-            }
-            acc.cnt = 0;
-            emit = '╳';
-        }
-    } else {
-        emit = '╳';
-    }
-
-    acc.last = Some(value.clone());
-    acc.msg.push(emit);
-
-    acc
-}
-
-#[derive(Clone,Copy)]
-enum WaveFormat {
-    Bit,
-    Vector,
-}
-
-fn build_waveform_vec<'a, T>(line_data: T, zoom: usize) -> String 
-    where
-        T: Iterator<Item = &'a Integer>
-{
-    line_data
-        .map(|x| core::iter::repeat(x).take(zoom))
-        .flatten()
-        .fold(FormatAcc::new(), format_vec)
-        .msg
-}
-
-fn build_waveform_bit<'a, T>(line_data: T, zoom: usize) -> String 
-    where
-        T: Iterator<Item = &'a Integer>
-{
-    line_data
-        .map(|x| core::iter::repeat(x).take(zoom))
-        .flatten()
-        .map(format_bit)
-        .collect()
-}
-
-fn build_waveform<'a, T>(line_data: T, format: WaveFormat, zoom: usize) -> String 
-    where
-        T: Iterator<Item = &'a Integer>
-{
-    match format {
-        WaveFormat::Bit => build_waveform_bit(line_data, zoom),
-        WaveFormat::Vector => build_waveform_vec(line_data, zoom),
-    }
-}
-
-
-
-fn build_table<'a>(data : &'a Array2::<Integer>, formatters: &Vec<WaveFormat>, state: &State) -> Table<'a> {
+fn build_table<'a>(wave: &'a Wave, state: &State) -> Table<'a> {
     let even_style = Style::default()
         .fg(Color::Black)
         .bg(Color::White);
@@ -301,7 +213,7 @@ fn build_table<'a>(data : &'a Array2::<Integer>, formatters: &Vec<WaveFormat>, s
     let right = state.left_wave_col + state.wave_cols;
 
     for row_i in top..bot {
-        let fmt = build_waveform(data.slice(s![left..right, row_i]).iter(), formatters[row_i], state.zoom);
+        let fmt = build_waveform(wave.slice_of_signal(row_i, left, right), wave.formatter(row_i), state.zoom);
         let cur_cycle = (state.cur_wave_col - state.left_wave_col) * state.zoom;
         let s_pre: String = fmt.chars().take(cur_cycle).collect();
         let s_cur: String = fmt.chars().skip(cur_cycle).take(state.zoom).collect();
@@ -309,9 +221,11 @@ fn build_table<'a>(data : &'a Array2::<Integer>, formatters: &Vec<WaveFormat>, s
 
         let ref cur_style = if row_i % 2 == 0 { even_style } else { odd_style };
 
-        let name_cell = Cell::from(format!("row_{}", row_i))
+        let name_cell = Cell::from(wave.name(row_i).unwrap())
             .style(*cur_style);
-        let value_cell = Cell::from(format!("0x{:>8x}", data[[cur_cycle, row_i]]))
+        //let name_cell = Cell::from(format!("row_{}", row_i))
+            //.style(*cur_style);
+        let value_cell = Cell::from(format!("0x{:>8x}", wave.value(row_i, cur_cycle).unwrap()))
             .style(*cur_style);
         let wave_cell = Cell::from(Spans::from(vec![
                 Span::raw(s_pre),
@@ -343,15 +257,16 @@ fn build_statusline(state: &State) -> Paragraph {
 }
 
 fn main() -> Result<(),io::Error> {
-    crossterm::terminal::enable_raw_mode()
-        .expect("Can't run in raw mode");
+    let mut stdout = io::stdout();
+    
+    stdout.execute(EnterAlternateScreen)?;
+    crossterm::terminal::enable_raw_mode()?;
 
-    let stdout = io::stdout();
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
-    let (data, formatters) = {
+    /*let (data, formatters) = {
         //let mut data = vec![vec![Integer::from(0); 200]];
         //let mut data = Array2::<Integer>::zeros((1000, 200));
         let mut data = Array2::<Integer>::from_elem((1000, 200), Integer::from(0));
@@ -372,8 +287,9 @@ fn main() -> Result<(),io::Error> {
         formatters[5] = WaveFormat::Vector;
 
         (data, formatters)
-    };
+    };*/
 
+    let wave = Wave::new();
     let mut state = State::new();
 
     loop {
@@ -389,8 +305,8 @@ fn main() -> Result<(),io::Error> {
                 .split(size);
 
             state.resize(stack[0].width - 48, stack[0].height - 2);
-            state.data_size(data.dim().1, data.dim().0);
-            let table = build_table(&data, &formatters, &state);
+            state.data_size(wave.num_cycles(), wave.num_signals());
+            let table = build_table(&wave, &state);
 
             f.render_stateful_widget(table, size, state.get_mut_table_state());
 
@@ -462,7 +378,9 @@ fn main() -> Result<(),io::Error> {
         }
     }
 
-    crossterm::terminal::disable_raw_mode().unwrap();
+    crossterm::terminal::disable_raw_mode()?;
+    let mut stdout = io::stdout();
+    stdout.execute(LeaveAlternateScreen)?;
 
     Ok(())
 }
