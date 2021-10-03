@@ -1,8 +1,10 @@
 mod wave;
 mod formatting;
+mod load;
 
 use wave::Wave;
 use formatting::build_waveform;
+use load::test::TestLoader;
 
 use std::io;
 use tui::Terminal;
@@ -289,7 +291,9 @@ fn main() -> Result<(),io::Error> {
         (data, formatters)
     };*/
 
-    let wave = Wave::new();
+    //let wave = Wave::new();
+    let loader = TestLoader::new(200, 2000);
+    let wave = Wave::load(&loader);
     let mut state = State::new();
 
     loop {
