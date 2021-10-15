@@ -1,6 +1,7 @@
 use super::*;
 use crate::formatting::WaveFormat;
 
+use rug::{Assign,integer::Order};
 use std::path::Path;
 use std::fs::File;
 use std::collections::HashMap;
@@ -74,10 +75,22 @@ impl VcdLoader {
         (rv, sigmap)
     }
 
-    fn map_values_to_int(x: &Value) -> Integer {
+    fn map_values_to_int(target: &mut Integer, x: &Value) {
         match *x {
-            Value::V1 => Integer::from(1),
-            _ => Integer::from(0),
+            Value::V1 => target.assign(1),
+            _ => target.assign(0)
+        }
+    }
+
+    fn map_vec_to_int(target: &mut Integer, x: &Vec<Value>) {
+        target.assign(0);
+        for (i,bit) in x.iter().enumerate() {
+            let val = match *bit {
+                Value::V1 => true,
+                _ => false
+            };
+            
+            target.set_bit((x.len() - 1 - i) as u32, val);
         }
     }
 
@@ -86,12 +99,13 @@ impl VcdLoader {
         num_signals: usize,
         cycle_time: u64
     ) -> Vec<Vec<Integer>> {
-        let mut rv = vec![];
-        let mut vals = vec![Value::X; num_signals];
+        let mut rv: Vec<Vec<Integer>> = vec![];
+        let mut vals = vec![Integer::default(); num_signals];
         let mut cur_t = 0;
 
-        let ints: Vec<_> = vals.iter()
-            .map(Self::map_values_to_int)
+        let ints: Vec<Integer> = vals.iter()
+            .map(|x| x.clone())
+            //.map(Self::map_values_to_int)
             .collect();
         rv.push(ints);
 
@@ -107,7 +121,8 @@ impl VcdLoader {
                 Timestamp(t) => {
                     if (t - cur_t) >= cycle_time {
                         let ints: Vec<_> = vals.iter()
-                            .map(Self::map_values_to_int)
+                            .map(|x| x.clone())
+                            //.map(Self::map_values_to_int)
                             .collect();
                         rv.push(ints);
                         cur_t += cycle_time;
@@ -116,7 +131,13 @@ impl VcdLoader {
 
                 ChangeScalar(i, v) => {
                     if let Some(info) = ids.get(&i) {
-                        vals[info.index] = v;
+                        Self::map_values_to_int(&mut vals[info.index], &v);
+                    }
+                }
+
+                ChangeVector(i, v) => {
+                    if let Some(info) = ids.get(&i) {
+                        Self::map_vec_to_int(&mut vals[info.index], &v);
                     }
                 }
 
