@@ -246,7 +246,6 @@ fn build_table<'a>(wave: &'a Wave, state: &State) -> Table<'a> {
     for row_i in top..bot {
         let fmt = build_waveform(wave.slice_of_signal(row_i, left, right), wave.formatter(row_i), state.zoom);
         let cur_cycle = (state.cur_wave_col - state.left_wave_col) * state.zoom;
-        let cycle_i = state.cur_wave_col - state.left_wave_col;
         let s_pre: String = fmt.chars().take(cur_cycle).collect();
         let s_cur: String = fmt.chars().skip(cur_cycle).take(state.zoom).collect();
         let s_post: String = fmt.chars().skip(cur_cycle+state.zoom).collect();
@@ -257,7 +256,7 @@ fn build_table<'a>(wave: &'a Wave, state: &State) -> Table<'a> {
             .style(*cur_style);
         //let name_cell = Cell::from(format!("row_{}", row_i))
             //.style(*cur_style);
-        let value_cell = wave.value(row_i, cycle_i)
+        let value_cell = wave.value(row_i, state.cur_wave_col)
             .map(|val| Cell::from(format!("0x{:>8x}", val)))
             .unwrap_or(Cell::from("⁇"))
             .style(*cur_style);

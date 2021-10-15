@@ -49,7 +49,11 @@ impl VcdLoader {
                     match item {
                         ScopeItem::Var(var) => {
                             let name = format!("{}{}", prefix, var.reference);
-                            let format = WaveFormat::Vector;
+                            let format = if var.size == 1 {
+                                WaveFormat::Bit
+                            } else {
+                                WaveFormat::Vector
+                            };
 
                             rv.push(SignalDeclaration { name, format });
 
@@ -102,12 +106,6 @@ impl VcdLoader {
         let mut rv: Vec<Vec<Integer>> = vec![];
         let mut vals = vec![Integer::default(); num_signals];
         let mut cur_t = 0;
-
-        let ints: Vec<Integer> = vals.iter()
-            .map(|x| x.clone())
-            //.map(Self::map_values_to_int)
-            .collect();
-        rv.push(ints);
 
         for command in parser {
             if command.is_err() {
