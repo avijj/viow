@@ -16,29 +16,31 @@ impl TestLoader {
 
 
 impl LoadDeclarations for TestLoader {
-    fn load_declarations(&self) -> Vec<SignalDeclaration> {
-        (0..self.num_signals).map(|i| SignalDeclaration {
-                name: format!("row_{}", i),
-                format: WaveFormat::Bit
-            })
-            .collect()
+    fn load_declarations(&self) -> Result<Vec<SignalDeclaration>> {
+        Ok(
+            (0..self.num_signals).map(|i| SignalDeclaration {
+                    name: format!("row_{}", i),
+                    format: WaveFormat::Bit
+                })
+                .collect()
+        )
     }
 }
 
 
 impl LoadLength for TestLoader {
-    fn load_length(&self) -> usize {
-        self.num_cycles
+    fn load_length(&self) -> Result<usize> {
+        Ok(self.num_cycles)
     }
 }
 
 
 impl LoadWaveform for TestLoader {
-    fn load_waveform(&self, _name: impl AsRef<str>, cycles: Range<usize>) -> Vec<Integer> {
+    fn load_waveform(&self, _name: impl AsRef<str>, cycles: Range<usize>) -> Result<Vec<Integer>> {
         if cycles.contains(&self.num_cycles) {
-            vec![Integer::from(0); (cycles.start .. self.num_cycles).len()]
+            Ok(vec![Integer::from(0); (cycles.start .. self.num_cycles).len()])
         } else {
-            vec![Integer::from(0); cycles.len()]
+            Ok(vec![Integer::from(0); cycles.len()])
         }
     }
 }

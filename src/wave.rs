@@ -43,37 +43,37 @@ impl Wave {
         }
     }
 
-    pub fn load<T>(loader: &T) -> Self
+    pub fn load<T>(loader: &T) -> Result<Self>
         where
             T: LoadDeclarations + LoadLength + LoadWaveform
     {
-        let decls = loader.load_declarations();
-        let num_cycles = loader.load_length();
+        let decls = loader.load_declarations()?;
+        let num_cycles = loader.load_length()?;
         let mut data = Array2::default((num_cycles, decls.len()));
         let mut formatters = Vec::with_capacity(decls.len());
         let mut names = Vec::with_capacity(decls.len());
        
         for (i, decl) in decls.into_iter().enumerate() {
-            let wv = loader.load_waveform(&decl.name, 0..num_cycles);
+            let wv = loader.load_waveform(&decl.name, 0..num_cycles)?;
             data.slice_mut(s![..,i]).assign(&Array1::from_vec(wv));
 
             formatters.push(decl.format);
             names.push(decl.name);
         }
 
-        Self {
+        Ok(Self {
             data,
             formatters,
             names,
-        }
+        })
     }
 
     pub fn num_cycles(&self) -> usize {
-        self.data.dim().1
+        self.data.dim().0
     }
 
     pub fn num_signals(&self) -> usize {
-        self.data.dim().0
+        self.data.dim().1
     }
 
     pub fn slice_of_signal(&self,

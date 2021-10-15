@@ -4,9 +4,11 @@ mod load;
 
 use wave::Wave;
 use formatting::build_waveform;
-use load::test::TestLoader;
+//use load::test::TestLoader;
+use load::vcd::VcdLoader;
+use load::{Error as LoadError};
 
-use std::io;
+use anyhow::Result;
 use tui::Terminal;
 use tui::backend::CrosstermBackend;
 use tui::widgets::{
@@ -23,6 +25,8 @@ use crossterm::{
     event::{self, Event, KeyEvent, KeyCode}
 };
 use std::time::Duration;
+use std::path::PathBuf;
+use std::io;
 
 
 struct State {
@@ -123,7 +127,9 @@ impl State {
                 self.cur_wave_row -= 1;
             }
         } else {
-            self.table_state.select(Some(self.wave_rows - 1));
+            let last_row = std::cmp::min(self.wave_rows, self.data_rows) - 1;
+
+            self.table_state.select(Some(last_row));
             self.cur_wave_row = self.data_rows - 1;
             self.top_wave_row = self.data_rows - self.wave_rows;
         }
@@ -131,7 +137,9 @@ impl State {
 
     fn move_cursor_down(&mut self) {
         if let Some(sel) = self.table_state.selected() {
-            if sel < self.wave_rows - 1 {
+            let last_row = std::cmp::min(self.wave_rows, self.data_rows) - 1;
+
+            if sel < last_row {
                 self.table_state.select(Some(sel+1));
                 self.cur_wave_row += 1;
             } else if self.cur_wave_row < self.data_rows - 1 {
@@ -164,8 +172,8 @@ impl State {
     }
 
     fn move_page_right(&mut self) {
-        if self.left_wave_col < self.data_cols - 1 {
-            let inc = std::cmp::min(self.data_cols - self.left_wave_col - self.wave_cols, self.wave_cols);
+        if self.left_wave_col + self.wave_cols < self.data_cols - 1 {
+            let inc = self.data_cols - self.left_wave_col - self.wave_cols;
             self.left_wave_col += inc;
             self.cur_wave_col = self.left_wave_col;
         }
@@ -180,12 +188,33 @@ impl State {
     }
 
     fn zoom_in(&mut self) {
-        self.zoom += 1;
+        let left_to_cur = (self.cur_wave_col - self.left_wave_col) * self.zoom;
+        //self.zoom += 1;
+        self.zoom *= 2;
+        self.left_wave_col = std::cmp::min(
+            self.cur_wave_col - (left_to_cur / self.zoom),
+            if self.data_cols >= self.wave_cols { self.data_cols - self.wave_cols } else { 0 }
+        );
     }
 
     fn zoom_out(&mut self) {
         if self.zoom > 1 {
-            self.zoom -= 1;
+            let left_to_cur = (self.cur_wave_col - self.left_wave_col) * self.zoom;
+            //self.zoom -= 1;
+            self.zoom /= 2;
+            self.left_wave_col = std::cmp::min(
+                if self.cur_wave_col > (left_to_cur / self.zoom) {
+                    self.cur_wave_col - (left_to_cur / self.zoom)
+                } else { 
+                    0
+                },
+
+                if self.data_cols >= self.wave_cols {
+                    self.data_cols - self.wave_cols
+                } else { 
+                    0
+                }
+            );
         }
     }
 }
@@ -210,24 +239,27 @@ fn build_table<'a>(wave: &'a Wave, state: &State) -> Table<'a> {
     let mut rows = Vec::with_capacity(state.wave_rows);
 
     let top = state.top_wave_row;
-    let bot = state.top_wave_row + state.wave_rows;
+    let bot = std::cmp::min(state.top_wave_row + state.wave_rows, wave.num_signals());
     let left = state.left_wave_col;
-    let right = state.left_wave_col + state.wave_cols;
+    let right = std::cmp::min(state.left_wave_col + state.wave_cols, wave.num_cycles());
 
     for row_i in top..bot {
         let fmt = build_waveform(wave.slice_of_signal(row_i, left, right), wave.formatter(row_i), state.zoom);
         let cur_cycle = (state.cur_wave_col - state.left_wave_col) * state.zoom;
+        let cycle_i = state.cur_wave_col - state.left_wave_col;
         let s_pre: String = fmt.chars().take(cur_cycle).collect();
         let s_cur: String = fmt.chars().skip(cur_cycle).take(state.zoom).collect();
         let s_post: String = fmt.chars().skip(cur_cycle+state.zoom).collect();
 
         let ref cur_style = if row_i % 2 == 0 { even_style } else { odd_style };
 
-        let name_cell = Cell::from(wave.name(row_i).unwrap())
+        let name_cell = Cell::from(wave.name(row_i).unwrap_or("⁇⁇⁇"))
             .style(*cur_style);
         //let name_cell = Cell::from(format!("row_{}", row_i))
             //.style(*cur_style);
-        let value_cell = Cell::from(format!("0x{:>8x}", wave.value(row_i, cur_cycle).unwrap()))
+        let value_cell = wave.value(row_i, cycle_i)
+            .map(|val| Cell::from(format!("0x{:>8x}", val)))
+            .unwrap_or(Cell::from("⁇"))
             .style(*cur_style);
         let wave_cell = Cell::from(Spans::from(vec![
                 Span::raw(s_pre),
@@ -258,12 +290,8 @@ fn build_statusline(state: &State) -> Paragraph {
     Paragraph::new(line_txt)
 }
 
-fn main() -> Result<(),io::Error> {
-    let mut stdout = io::stdout();
-    
-    stdout.execute(EnterAlternateScreen)?;
-    crossterm::terminal::enable_raw_mode()?;
 
+fn render_loop(stdout: std::io::Stdout) -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
@@ -292,8 +320,9 @@ fn main() -> Result<(),io::Error> {
     };*/
 
     //let wave = Wave::new();
-    let loader = TestLoader::new(200, 2000);
-    let wave = Wave::load(&loader);
+    //let loader = TestLoader::new(200, 2000);
+    let loader = VcdLoader::new(PathBuf::from("counter.vcd"))?;
+    let wave = Wave::load(&loader)?;
     let mut state = State::new();
 
     loop {
@@ -309,7 +338,7 @@ fn main() -> Result<(),io::Error> {
                 .split(size);
 
             state.resize(stack[0].width - 48, stack[0].height - 2);
-            state.data_size(wave.num_cycles(), wave.num_signals());
+            state.data_size(wave.num_signals(), wave.num_cycles());
             let table = build_table(&wave, &state);
 
             f.render_stateful_widget(table, size, state.get_mut_table_state());
@@ -382,9 +411,30 @@ fn main() -> Result<(),io::Error> {
         }
     }
 
-    crossterm::terminal::disable_raw_mode()?;
-    let mut stdout = io::stdout();
-    stdout.execute(LeaveAlternateScreen)?;
-
     Ok(())
+}
+
+fn main() -> Result<()> {
+    let mut stdout = io::stdout();
+    
+    stdout.execute(EnterAlternateScreen)?;
+    crossterm::terminal::enable_raw_mode()?;
+
+    match render_loop(stdout) {
+        Ok(_) => {
+            crossterm::terminal::disable_raw_mode()?;
+            let mut stdout = io::stdout();
+            stdout.execute(LeaveAlternateScreen)?;
+            Ok(())
+        }
+
+        Err(err) => {
+            crossterm::terminal::disable_raw_mode()?;
+            let mut stdout = io::stdout();
+            stdout.execute(LeaveAlternateScreen)?;
+
+            println!("Error: {}", err); 
+            Err(err)
+        }
+    }
 }
