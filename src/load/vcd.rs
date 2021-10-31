@@ -21,13 +21,13 @@ pub struct VcdLoader {
 }
 
 impl VcdLoader {
-    pub fn new(filename: impl AsRef<Path>) -> Result<Self> {
+    pub fn new(filename: impl AsRef<Path>, cycle_time: u64) -> Result<Self> {
         let file = File::open(filename.as_ref())?;
         let mut parser = Parser::new(file);
 
         let header = parser.parse_header()?;
         let (signals, ids) = Self::load_all_scopes(&header);
-        let data = Self::load_all_waveforms(&mut parser, &ids, signals.len(), 100000);
+        let data = Self::load_all_waveforms(&mut parser, &ids, signals.len(), cycle_time);
 
         let num_cycles= data.len();
 

@@ -24,6 +24,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
     event::{self, Event, KeyEvent, KeyCode}
 };
+use clap::Parser;
 use std::time::Duration;
 use std::path::PathBuf;
 use std::io;
@@ -290,37 +291,14 @@ fn build_statusline(state: &State) -> Paragraph {
 }
 
 
-fn render_loop(stdout: std::io::Stdout) -> Result<()> {
+fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
-    /*let (data, formatters) = {
-        //let mut data = vec![vec![Integer::from(0); 200]];
-        //let mut data = Array2::<Integer>::zeros((1000, 200));
-        let mut data = Array2::<Integer>::from_elem((1000, 200), Integer::from(0));
-        let mut formatters = vec![WaveFormat::Bit; 200];
-        data.slice_mut(s![..,1]).fill(Integer::from(1));
-        data.slice_mut(s![..;2,2]).fill(Integer::from(1));
-
-        let counter: Vec<Integer> = (0..data.dim().0).into_iter()
-            .map(|x: usize| Integer::from((x >> 2) % 16))
-            .collect();
-        data.slice_mut(s![..,4]).assign(&Array1::from_vec(counter));
-        formatters[4] = WaveFormat::Vector;
-
-        let counter: Vec<Integer> = (0x4000..data.dim().0 + 0x4000).into_iter()
-            .map(|x: usize| Integer::from((x >> 2) % 0x10000))
-            .collect();
-        data.slice_mut(s![..,5]).assign(&Array1::from_vec(counter));
-        formatters[5] = WaveFormat::Vector;
-
-        (data, formatters)
-    };*/
-
     //let wave = Wave::new();
     //let loader = TestLoader::new(200, 2000);
-    let loader = VcdLoader::new(PathBuf::from("counter.vcd"))?;
+    let loader = VcdLoader::new(PathBuf::from(opts.input), opts.clock_period)?;
     let wave = Wave::load(&loader)?;
     let mut state = State::new();
 
@@ -413,13 +391,26 @@ fn render_loop(stdout: std::io::Stdout) -> Result<()> {
     Ok(())
 }
 
+
+/// Display a wave file in the console.
+#[derive(Parser)]
+struct Opts {
+    /// Input file with data to display
+    input: String,
+
+    /// Clock period in number of timeunits to sample displayed data
+    #[clap(short, long)]
+    clock_period: u64,
+}
+
 fn main() -> Result<()> {
+    let opts: Opts = Opts::parse();
     let mut stdout = io::stdout();
     
     stdout.execute(EnterAlternateScreen)?;
     crossterm::terminal::enable_raw_mode()?;
 
-    match render_loop(stdout) {
+    match render_loop(stdout, opts) {
         Ok(_) => {
             crossterm::terminal::disable_raw_mode()?;
             let mut stdout = io::stdout();
