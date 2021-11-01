@@ -17,3 +17,4 @@ vcd = "0.6"
 thiserror = "1.0"
 anyhow = "1.0"
 clap = "3.0.0-beta.5"
+mlua = { version = "0.6", features = [ "lua54" ] }
