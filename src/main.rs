@@ -14,6 +14,7 @@ use load::vcd::VcdLoader;
 use scripts::{
     lua::LuaInterpreter
 };
+use data::{SimTime, SimTimeUnit};
 use pipeline::*;
 
 use anyhow::Result;
@@ -38,7 +39,9 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
 
     //let wave = Wave::new();
     //let loader = TestLoader::new(200, 2000);
-    let loader = VcdLoader::new(PathBuf::from(opts.input), opts.clock_period)?;
+    let opt_timeunits = opts.timeunits.trim().to_lowercase();
+    let cycle_time = SimTime::new(opts.clock_period, SimTimeUnit::from_string(opt_timeunits)?);
+    let loader = VcdLoader::new(PathBuf::from(opts.input), cycle_time)?;
     let source_adapter = SourceAdapter { };   // FIXME
     let exit_adapter = ExitAdapter {};  // FIXME
     let wave = Wave::load_new(loader, source_adapter, exit_adapter)?;
@@ -175,6 +178,10 @@ struct Opts {
     /// Clock period in number of timeunits to sample displayed data
     #[clap(short, long)]
     clock_period: u64,
+
+    /// Timeunits to use to interpret times given in arguments
+    #[clap(short, long)]
+    timeunits: String,
 }
 
 fn main() -> Result<()> {

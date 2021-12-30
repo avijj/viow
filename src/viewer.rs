@@ -2,7 +2,7 @@ use crate::scripts::RunCommand;
 use crate::scripts::Error as InterpError;
 use crate::formatting::build_waveform;
 use crate::wave::Wave;
-use crate::data;
+use crate::data::*;
 
 use tui::widgets::TableState;
 use tui::widgets::{ Table, Row, Cell, Paragraph };
@@ -265,7 +265,7 @@ impl State {
 
 pub fn build_table<'a, S>(wave: &'a Wave<S>, state: &State) -> Table<'a> 
     where
-        S: data::Source<Vec<String>, String, rug::Integer>
+        S: Source<String, rug::Integer>
 {
     let even_style = Style::default()
         .fg(Color::Black)

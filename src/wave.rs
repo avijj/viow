@@ -18,7 +18,7 @@ pub struct Wave<S>
 
 impl<S> Wave<S>
     where
-        S: Source<Vec<String>, String, rug::Integer>
+        S: Source<String, rug::Integer>
 {
     /*pub fn _new() -> Self {
         //let mut data = vec![vec![Integer::from(0); 200]];
@@ -53,14 +53,18 @@ impl<S> Wave<S>
 
     pub fn load_new(source: S, source_adapter: SourceAdapter, exit_adapter: ExitAdapter) -> Result<Self> {
         let pipe = Pipeline::new(source, source_adapter, exit_adapter);
-        let names = pipe.query_ids()?;
+        let signals = pipe.query_signals()?;
+        let mut names = Vec::with_capacity(signals.len());
+        let mut formatters = Vec::with_capacity(signals.len());
+
+        for signal in signals {
+            let (name, format) = signal;
+            names.push(name);
+            formatters.push(format);
+        }
+
         let times = pipe.query_time()?;
         let data = pipe.sample(&names, &times)?;
-
-        let formatters: Result<Vec<_>> = names.iter()
-            .map(|id| pipe.query_format(id))
-            .collect();
-        let formatters = formatters?;
 
         Ok(Self {
             data,
@@ -70,7 +74,7 @@ impl<S> Wave<S>
         })
     }
 
-    pub fn load<T>(loader: &T) -> Result<Self>
+    pub fn _load<T>(loader: &T) -> Result<Self>
         where
             T: LoadDeclarations + LoadLength + LoadWaveform
     {

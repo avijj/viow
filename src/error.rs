@@ -11,6 +11,9 @@ pub enum Error {
 
     #[error("The given range {0:?} is invalid within limits of {1:?}.")]
     InvalidRange(Range<usize>, Range<usize>),
+
+    #[error("The given text '{0:}' can not be interpreted as time.")]
+    InvalidTime(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

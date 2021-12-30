@@ -7,6 +7,7 @@ use std::path::Path;
 use std::fs::File;
 use std::collections::HashMap;
 use ::vcd::{ self, Parser, ScopeItem, Header, Value };
+use ndarray::prelude::*;
 
 struct SignalInfo {
     index: usize,
@@ -19,10 +20,11 @@ pub struct VcdLoader {
     signals: Vec<SignalDeclaration>,
     data: Vec<Vec<Integer>>,
     num_cycles: usize,
+    cycle_time: SimTime,
 }
 
 impl VcdLoader {
-    pub fn new(filename: impl AsRef<Path>, cycle_time: u64) -> Result<Self> {
+    pub fn new(filename: impl AsRef<Path>, cycle_time: SimTime) -> Result<Self> {
         let file = File::open(filename.as_ref())?;
         let mut parser = Parser::new(file);
 
@@ -35,7 +37,8 @@ impl VcdLoader {
         Ok(Self {
             signals,
             data,
-            num_cycles
+            num_cycles,
+            cycle_time
         })
     }
 
@@ -99,14 +102,29 @@ impl VcdLoader {
         }
     }
 
+    fn timescale_to_simtime(ts: u32, unit: vcd::TimescaleUnit) -> SimTime {
+        use vcd::TimescaleUnit::*;
+        let u = match unit {
+            S => SimTimeUnit::S,
+            MS => SimTimeUnit::Ms,
+            US => SimTimeUnit::Us,
+            NS => SimTimeUnit::Ns,
+            PS => SimTimeUnit::Ps,
+            FS => SimTimeUnit::Fs,
+        };
+
+        SimTime::new(ts as u64, u)
+    }
+
     fn load_all_waveforms<T: std::io::Read>(parser: &mut Parser<T>,
         ids: &SignalMap,
         num_signals: usize,
-        cycle_time: u64
+        cycle_time: SimTime 
     ) -> Vec<Vec<Integer>> {
         let mut rv: Vec<Vec<Integer>> = vec![];
         let mut vals = vec![Integer::default(); num_signals];
         let mut cur_t = 0;
+        let mut cycle_time_ts: u64 = cycle_time / SimTime::from_ps(1);
 
         for command in parser {
             if command.is_err() {
@@ -117,14 +135,19 @@ impl VcdLoader {
 
             use vcd::Command::*;
             match command {
+                Timescale(ts, unit) => {
+                    let timescale = Self::timescale_to_simtime(ts, unit);
+                    cycle_time_ts = cycle_time / timescale;
+                }
+
                 Timestamp(t) => {
-                    if (t - cur_t) >= cycle_time {
+                    if (t - cur_t) >= cycle_time_ts {
                         let ints: Vec<_> = vals.iter()
                             .map(|x| x.clone())
                             //.map(Self::map_values_to_int)
                             .collect();
                         rv.push(ints);
-                        cur_t += cycle_time;
+                        cur_t += cycle_time_ts;
                     }
                 }
 
@@ -190,22 +213,23 @@ impl LoadWaveform for VcdLoader {
 // new style traits
 //
 
-impl<I> QuerySource<I> for VcdLoader
-    where 
-        I: IntoIterator<Item = String>
-{
+impl QuerySource for VcdLoader {
     type Id = String;
+    type IntoSignalIter = Vec<(Self::Id, WaveFormat)>;
 
-    fn query_ids(&self) -> Result<I> {
-        unimplemented!();
+    fn query_signals(&self) -> Result<Self::IntoSignalIter> {
+        let rv: Self::IntoSignalIter = self.signals.iter()
+            .map(|decl| (decl.name.clone(), decl.format.clone()))
+            .collect();
+
+        Ok(rv)
     }
 
     fn query_time(&self) -> Result<SimTimeRange> {
-        unimplemented!();
-    }
+        let start = SimTime::zero();
+        let stop = self.cycle_time * (self.num_cycles as u64);
 
-    fn query_format(&self, id: &Self::Id) -> Result<WaveFormat> {
-        unimplemented!();
+        Ok(SimTimeRange(start, stop))
     }
 }
 
@@ -214,13 +238,18 @@ impl Sample for VcdLoader {
     type Value = Integer;
 
     fn sample(&self, ids: &Vec<Self::Id>, times: &SimTimeRange) -> Result<CycleValues<Self::Value>> {
-        unimplemented!();
+        let start_cycle = (times.0 / self.cycle_time) as usize;
+        let stop_cycle = (times.1 / self.cycle_time) as usize + 1;
+
+        let mut data = Array2::default((stop_cycle - start_cycle, ids.len()));
+        for (i, id) in ids.iter().enumerate() {
+            let wv = self.load_waveform(id, start_cycle..stop_cycle)?;
+            data.slice_mut(s![..,i]).assign(&Array1::from_vec(wv));
+        }
+
+        Ok(data)
     }
 }
 
-impl<I> Source<I, String, Integer> for VcdLoader
-    where
-        I: IntoIterator<Item = <Self as Sample>::Id>
-{
-}
+impl Source<String, Integer> for VcdLoader {}
 
