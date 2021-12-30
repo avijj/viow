@@ -1,18 +1,26 @@
+use crate::error::*;
 use crate::formatting::{WaveFormat};
 use crate::load::*;
+use crate::data::*;
+use crate::pipeline::*;
 
 use ndarray::prelude::*;
 use ndarray;
 use rug::Integer;
 
-pub struct Wave {
+pub struct Wave<S> 
+{
     data: Array2<Integer>,
     formatters: Vec<WaveFormat>,
     names: Vec<String>,
+    pipe: Pipeline<S>,
 }
 
-impl Wave {
-    pub fn new() -> Self {
+impl<S> Wave<S>
+    where
+        S: Source<Vec<String>, String, rug::Integer>
+{
+    /*pub fn _new() -> Self {
         //let mut data = vec![vec![Integer::from(0); 200]];
         //let mut data = Array2::<Integer>::zeros((1000, 200));
         let mut data = Array2::<Integer>::from_elem((1000, 200), Integer::from(0));
@@ -41,6 +49,25 @@ impl Wave {
             formatters,
             names
         }
+    }*/
+
+    pub fn load_new(source: S, source_adapter: SourceAdapter, exit_adapter: ExitAdapter) -> Result<Self> {
+        let pipe = Pipeline::new(source, source_adapter, exit_adapter);
+        let names = pipe.query_ids()?;
+        let times = pipe.query_time()?;
+        let data = pipe.sample(&names, &times)?;
+
+        let formatters: Result<Vec<_>> = names.iter()
+            .map(|id| pipe.query_format(id))
+            .collect();
+        let formatters = formatters?;
+
+        Ok(Self {
+            data,
+            formatters,
+            names,
+            pipe,
+        })
     }
 
     pub fn load<T>(loader: &T) -> Result<Self>
@@ -61,11 +88,12 @@ impl Wave {
             names.push(decl.name);
         }
 
-        Ok(Self {
-            data,
-            formatters,
-            names,
-        })
+        unimplemented!();
+        //Ok(Self {
+            //data,
+            //formatters,
+            //names,
+        //})
     }
 
     pub fn num_cycles(&self) -> usize {

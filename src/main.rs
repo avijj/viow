@@ -1,8 +1,11 @@
+mod error;
 mod wave;
 mod formatting;
 mod load;
 mod scripts;
 mod viewer;
+mod data;
+mod pipeline;
 
 use wave::Wave;
 use viewer::*;
@@ -11,6 +14,7 @@ use load::vcd::VcdLoader;
 use scripts::{
     lua::LuaInterpreter
 };
+use pipeline::*;
 
 use anyhow::Result;
 use tui::Terminal;
@@ -35,7 +39,9 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
     //let wave = Wave::new();
     //let loader = TestLoader::new(200, 2000);
     let loader = VcdLoader::new(PathBuf::from(opts.input), opts.clock_period)?;
-    let wave = Wave::load(&loader)?;
+    let source_adapter = SourceAdapter { };   // FIXME
+    let exit_adapter = ExitAdapter {};  // FIXME
+    let wave = Wave::load_new(loader, source_adapter, exit_adapter)?;
     let mut state = State::new();
     //let mut interpreter = LuaInterpreter::new(state, wave);
     let mut interpreter = LuaInterpreter::new();

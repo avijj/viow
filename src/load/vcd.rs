@@ -1,5 +1,6 @@
 use super::*;
 use crate::formatting::WaveFormat;
+use crate::data::*;
 
 use rug::{Assign,integer::Order};
 use std::path::Path;
@@ -183,5 +184,43 @@ impl LoadWaveform for VcdLoader {
             Err(Error::NotFound(name.as_ref().to_string()))
         }
     }
+}
+
+// 
+// new style traits
+//
+
+impl<I> QuerySource<I> for VcdLoader
+    where 
+        I: IntoIterator<Item = String>
+{
+    type Id = String;
+
+    fn query_ids(&self) -> Result<I> {
+        unimplemented!();
+    }
+
+    fn query_time(&self) -> Result<SimTimeRange> {
+        unimplemented!();
+    }
+
+    fn query_format(&self, id: &Self::Id) -> Result<WaveFormat> {
+        unimplemented!();
+    }
+}
+
+impl Sample for VcdLoader {
+    type Id = String;
+    type Value = Integer;
+
+    fn sample(&self, ids: &Vec<Self::Id>, times: &SimTimeRange) -> Result<CycleValues<Self::Value>> {
+        unimplemented!();
+    }
+}
+
+impl<I> Source<I, String, Integer> for VcdLoader
+    where
+        I: IntoIterator<Item = <Self as Sample>::Id>
+{
 }
 
