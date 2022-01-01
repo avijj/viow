@@ -64,11 +64,21 @@ pub trait Transform {
     fn transform(&self, value: Self::InValue) -> Self::OutValue;
 }
 
+// FIXME Need way to filter signals and to translate format as well. Also should work on blocks of
+// signals, instead of individual ones.
+pub trait TranslateSignal {
+    type InId;
+    type OutId;
+
+    fn translate_signal(&self, id: &Self::InId) -> Result<Self::OutId>;
+}
+
 pub trait Source<Id, V>: QuerySource<Id = Id> + Sample<Id = Id, Value = V> {}
 
 pub trait Filter<Id, InVal, OutVal>:
     QuerySource<Id = Id>
     + Sample<Id = Id, Value = OutVal>
     + Transform<InValue = InVal, OutValue = OutVal>
+    + TranslateSignal<InId = Id, OutId = Id>
 {
 }

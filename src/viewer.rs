@@ -265,7 +265,7 @@ impl State {
 
 pub fn build_table<'a, S>(wave: &'a Wave<S>, state: &State) -> Table<'a> 
     where
-        S: Source<String, rug::Integer>
+        S: Source<String, rug::Integer> + LookupId<FromId = String, ToId = usize>
 {
     let even_style = Style::default()
         .fg(Color::Black)

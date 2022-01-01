@@ -18,7 +18,7 @@ pub struct Wave<S>
 
 impl<S> Wave<S>
     where
-        S: Source<String, rug::Integer>
+        S: Source<String, rug::Integer> + LookupId<FromId = String, ToId = usize>
 {
     /*pub fn _new() -> Self {
         //let mut data = vec![vec![Integer::from(0); 200]];

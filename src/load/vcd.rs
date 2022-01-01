@@ -233,6 +233,21 @@ impl QuerySource for VcdLoader {
     }
 }
 
+impl LookupId for VcdLoader {
+    type FromId = String;
+    type ToId = usize;
+
+    fn lookup_id(&self, id: Self::FromId) -> Result<Self::ToId> {
+        let pos = self.signals.iter()
+            .position(|x| x.name == id);
+
+        match pos {
+            Some(p) => Ok(p),
+            None => Err(Error::NotFound(id))
+        }
+    }
+}
+
 impl Sample for VcdLoader {
     type Id = String;
     type Value = Integer;
