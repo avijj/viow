@@ -6,10 +6,8 @@ pub struct Identity<T> {
 
 impl<T> Transform for Identity<T>
 {
-    type InValue = T;
-    type OutValue = T;
+    type Value = T;
 
-    fn transform(&self, value: T) -> T {
-        value
+    fn transform(&self, value: &mut T) {
     }
 }

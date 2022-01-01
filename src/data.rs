@@ -32,13 +32,6 @@ pub trait QuerySource {
     fn query_time(&self) -> Result<SimTimeRange>;
 }
 
-pub trait AssignId {
-    type FromId;
-    type ToId;
-
-    fn assign_id(&mut self, id: Self::FromId) -> Result<Self::ToId>;
-}
-
 pub trait LookupId {
     type FromId;
     type ToId;
@@ -63,27 +56,23 @@ pub trait Sample {
 }
 
 pub trait Transform {
-    type InValue;
-    type OutValue;
+    type Value;
 
-    fn transform(&self, value: Self::InValue) -> Self::OutValue;
+    fn transform(&self, value: &mut Self::Value);
 }
 
-// FIXME Need way to filter signals and to translate format as well. Also should work on blocks of
-// signals, instead of individual ones.
-pub trait TranslateSignal {
-    type InId;
-    type OutId;
+pub trait TranslateSignals<I> {
+    type IntoSigIter: IntoIterator<Item = Signal<I>>;
+    type IntoIdIter: IntoIterator<Item = I>;
 
-    fn translate_signal(&self, id: &Self::InId) -> Result<Self::OutId>;
+    fn translate_signals(&self, signals: Self::IntoSigIter) -> Result<Self::IntoSigIter>;
+    fn rev_translate_ids(&self, signals: Self::IntoIdIter) -> Result<Self::IntoIdIter>;
 }
 
 pub trait Source<Id, V>: QuerySource<Id = Id> + Sample<Id = Id, Value = V> {}
 
-pub trait Filter<Id, InVal, OutVal>:
-    QuerySource<Id = Id>
-    + Sample<Id = Id, Value = OutVal>
-    + Transform<InValue = InVal, OutValue = OutVal>
-    + TranslateSignal<InId = Id, OutId = Id>
+pub trait Filter<I, V>:
+    Transform<Value = V>
+    + TranslateSignals<I>
 {
 }
