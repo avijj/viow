@@ -12,7 +12,11 @@ use crate::formatting::WaveFormat;
 // Types
 //
 
-
+pub struct Signal<I> {
+    pub id: I,
+    pub name: String,
+    pub format: WaveFormat,
+}
 
 pub type CycleValues<T> = Array2<T>;
 
@@ -22,7 +26,7 @@ pub type CycleValues<T> = Array2<T>;
 
 pub trait QuerySource {
     type Id;
-    type IntoSignalIter: IntoIterator<Item = (Self::Id, WaveFormat)>;
+    type IntoSignalIter: IntoIterator<Item = Signal<Self::Id>>;
 
     fn query_signals(&self) -> Result<Self::IntoSignalIter>;
     fn query_time(&self) -> Result<SimTimeRange>;
@@ -39,7 +43,8 @@ pub trait LookupId {
     type FromId;
     type ToId;
 
-    fn lookup_id(&self, id: Self::FromId) -> Result<Self::ToId>;
+    fn lookup_id(&self, id: &Self::FromId) -> Result<Self::ToId>;
+    fn rev_lookup_id(&self, id: &Self::ToId) -> Result<Self::FromId>;
 }
 
 pub trait Sample {

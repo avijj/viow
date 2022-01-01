@@ -42,9 +42,7 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
     let opt_timeunits = opts.timeunits.trim().to_lowercase();
     let cycle_time = SimTime::new(opts.clock_period, SimTimeUnit::from_string(opt_timeunits)?);
     let loader = VcdLoader::new(PathBuf::from(opts.input), cycle_time)?;
-    let source_adapter = SourceAdapter { };   // FIXME
-    let exit_adapter = ExitAdapter {};  // FIXME
-    let wave = Wave::load_new(loader, source_adapter, exit_adapter)?;
+    let wave = Wave::load_new(loader)?;
     let mut state = State::new();
     //let mut interpreter = LuaInterpreter::new(state, wave);
     let mut interpreter = LuaInterpreter::new();

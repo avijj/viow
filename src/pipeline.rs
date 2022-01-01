@@ -2,273 +2,138 @@ use crate::data::*;
 use crate::error::*;
 use crate::formatting::WaveFormat;
 
-pub struct GenericPipeline<S, PipeId, ExitId, PipeVal, A, B> {
-    //source: S,
-    source_adapter: A,  // FIXME remove
-    stages: Stage<S, PipeId, PipeVal>,
-    //stages:
-        //Vec<Box<dyn Filter<PipeId, PipeVal, PipeVal, IntoSignalIter = Vec<(PipeId, WaveFormat)>>>>,
-    exit_adapter: B,
-
-    _mark: std::marker::PhantomData<*const ExitId>,
-}
-
-pub type Pipeline<S> = GenericPipeline<S, usize, String, rug::Integer, SourceAdapter, ExitAdapter>;
-
-impl<S, SrcId, PipeId, ExitId, SrcVal, PipeVal, A, B> GenericPipeline<S, PipeId, ExitId, PipeVal, A, B>
-where
-    A: LookupId<FromId = SrcId, ToId = PipeId> + Transform<InValue = SrcVal, OutValue = PipeVal>,
-    S: Source<SrcId, SrcVal>
-{
-    pub fn new(source: S, source_adapter: A, exit_adapter: B) -> Self {
-        let source_stage = Stage::Src(source);
-
-        Self {
-            source_adapter,
-            stages: source_stage,
-            exit_adapter,
-            _mark: std::marker::PhantomData,
-        }
-    }
-}
-
-impl<S, SrcId, PipeId, ExitId, SrcVal, PipeVal, A, B> QuerySource
-    for GenericPipeline<S, PipeId, ExitId, PipeVal, A, B>
-where
-    A: LookupId<FromId = SrcId, ToId = PipeId> + Transform<InValue = SrcVal, OutValue = PipeVal>,
-    B: LookupId<FromId = PipeId, ToId = ExitId>,
-    S: Source<SrcId, SrcVal> + LookupId<FromId = SrcId, ToId = PipeId>,
-{
-    type Id = ExitId;
-    type IntoSignalIter = Vec<(Self::Id, WaveFormat)>;
-
-    fn query_signals(&self) -> Result<Self::IntoSignalIter> {
-        let rv: Result<Vec<(ExitId, WaveFormat)>>;
-        rv = self.stages
-            .query_signals()?
-            .into_iter()
-            .map(|(pipe_id, format)| -> Result<_> {
-                let exit_id = self.exit_adapter.lookup_id(pipe_id)?;
-                Ok((exit_id, format))
-            })
-            .collect();
-
-        rv
-    }
-
-    fn query_time(&self) -> Result<SimTimeRange> {
-        self.stages.query_time()
-    }
-}
-
-impl<S, PipeId, ExitId, PipeVal, ExitVal, A, B> Sample
-    for GenericPipeline<S, PipeId, ExitId, PipeVal, A, B>
-where
-    B: Transform<InValue = PipeVal, OutValue = ExitVal>,
-{
-    type Id = ExitId;
-    type Value = ExitVal;
-
-    fn sample(
-        &self,
-        ids: &Vec<Self::Id>,
-        times: &SimTimeRange,
-    ) -> Result<CycleValues<Self::Value>> {
-        unimplemented!();
-    }
-}
-
-//
-// SourceAdapter
-//
-
-pub struct SourceAdapter {}
-
-impl Transform for SourceAdapter {
-    type InValue = rug::Integer;
-    type OutValue = rug::Integer;
-
-    fn transform(&self, value: Self::InValue) -> Self::OutValue {
-        value
-    }
-}
-
-impl AssignId for SourceAdapter {
-    type FromId = usize;
-    type ToId = String;
-
-    fn assign_id(&mut self, id: Self::FromId) -> Result<Self::ToId> {
-        unimplemented!();
-    }
-}
-
-impl LookupId for SourceAdapter {
-    type FromId = String;
-    type ToId = usize;
-
-    fn lookup_id(&self, id: Self::FromId) -> Result<Self::ToId> {
-        unimplemented!();
-    }
-}
-
-
-// //
-// // SourceStage
-// //
+// pub struct GenericPipeline<S, PipeId, SrcVal, PipeVal, E> {
+//     stages: Stage<S, PipeId, PipeVal>,
 // 
-// // FIXME reduce to concrete types, otherwise not really implementable.
-// pub struct SourceStage<S, SrcId, PipeId, SrcVal, PipeVal> 
-// {
-//     source: S,
-// 
-//     _mark_0: std::marker::PhantomData<SrcId>,
-//     _mark_1: std::marker::PhantomData<PipeId>,
-//     _mark_2: std::marker::PhantomData<SrcVal>,
-//     _mark_3: std::marker::PhantomData<PipeVal>,
+//     _mark_1: std::marker::PhantomData<*const SrcVal>,
 // }
 // 
-// impl<S, SrcId, PipeId, SrcVal, PipeVal> SourceStage<S, SrcId, PipeId, SrcVal, PipeVal> {
-//     fn new(source: S) -> Self {
+// pub type Pipeline<S> = GenericPipeline<S, usize, String, rug::Integer, rug::Integer, ExitAdapter>;
+// 
+// impl<S, PipeId, ExitId, SrcVal, PipeVal, E> GenericPipeline<S, PipeId, ExitId, SrcVal, PipeVal, E> {
+//     pub fn new(source: S, exit_adapter: E) -> Self {
+//         let source_stage = Stage::Src(source);
+// 
 //         Self {
-//             source,
+//             stages: source_stage,
+//             exit_adapter,
 //             _mark_0: std::marker::PhantomData,
 //             _mark_1: std::marker::PhantomData,
-//             _mark_2: std::marker::PhantomData,
-//             _mark_3: std::marker::PhantomData,
 //         }
 //     }
 // }
 // 
-// impl<S, SrcId, PipeId, SrcVal, PipeVal> Transform for SourceStage<S, SrcId, PipeId, SrcVal, PipeVal> {
-//     type InValue = PipeVal;
-//     type OutValue = PipeVal;
-// 
-//     fn transform(&self, value: Self::InValue) -> Self::OutValue {
-//         unimplemented!();
-//     }
-// }
-// 
-// impl<S, SrcId, PipeId, SrcVal, PipeVal> QuerySource for SourceStage<S, SrcId, PipeId, SrcVal, PipeVal>
+// impl<S, SrcId, PipeId, ExitId, SrcVal, PipeVal, E> QuerySource
+//     for GenericPipeline<S, PipeId, ExitId, SrcVal, PipeVal, E>
 // where
-//     S: Source<SrcId, SrcVal>
+//     E: LookupId<FromId = PipeId, ToId = ExitId>,
+//     S: Source<SrcId, SrcVal> + LookupId<FromId = SrcId, ToId = PipeId>,
 // {
-//     type Id = PipeId;
-//     type IntoSignalIter = Vec<(Self::Id, WaveFormat)>;
+//     type Id = ExitId;
+//     type IntoSignalIter = Vec<Signal<Self::Id>>;
 // 
 //     fn query_signals(&self) -> Result<Self::IntoSignalIter> {
-//         let src_sigs = self.source.query_signals()?;
-//         let pipe_sigs: Result<Vec<_>> = src_sigs.into_iter()
-//             .map(|(src_id, format)| -> Result<_> {
-//                 let pipe_id = self.lookup_id(src_id)?;
-//                 Ok((pipe_id, format))
+//         let rv: Result<Vec<Signal<ExitId>>>;
+//         rv = self.stages
+//             .query_signals()?
+//             .into_iter()
+//             .map(|signal| -> Result<_> {
+//                 Ok(Signal {
+//                     id: self.exit_adapter.lookup_id(signal.id)?,
+//                     name: signal.name,
+//                     format: signal.format
+//                 })
 //             })
 //             .collect();
 // 
-//         pipe_sigs
+//         rv
 //     }
 // 
 //     fn query_time(&self) -> Result<SimTimeRange> {
-//         self.source.query_time()
+//         self.stages.query_time()
 //     }
 // }
 // 
+// impl<S, PipeId, ExitId, SrcVal, PipeVal, ExitVal, E> Sample
+//     for GenericPipeline<S, PipeId, ExitId, SrcVal, PipeVal, E>
+// where
+//     E: Transform<InValue = PipeVal, OutValue = ExitVal>,
+// {
+//     type Id = ExitId;
+//     type Value = ExitVal;
 // 
-// impl<S, SrcId, PipeId, SrcVal, PipeVal> TranslateSignal for SourceStage<S, SrcId, PipeId, SrcVal, PipeVal> {
-//     type InId = PipeId;
-//     type OutId = PipeId;
-// 
-//     fn translate_signal(&self, id: &Self::InId) -> Result<Self::OutId> {
+//     fn sample(
+//         &self,
+//         ids: &Vec<Self::Id>,
+//         times: &SimTimeRange,
+//     ) -> Result<CycleValues<Self::Value>> {
 //         unimplemented!();
 //     }
 // }
 // 
-// impl<S, SrcId, PipeId, SrcVal, PipeVal> LookupId for SourceStage<S, SrcId, PipeId, SrcVal, PipeVal> {
-//     type FromId = SrcId;
-//     type ToId = PipeId;
+// 
+// //
+// // ExitAdapter
+// //
+// 
+// pub struct ExitAdapter {}
+// 
+// impl Transform for ExitAdapter {
+//     type InValue = rug::Integer;
+//     type OutValue = rug::Integer;
+// 
+//     fn transform(&self, value: Self::InValue) -> Self::OutValue {
+//         value
+//     }
+// }
+// 
+// impl AssignId for ExitAdapter {
+//     type FromId = String;
+//     type ToId = usize;
+// 
+//     fn assign_id(&mut self, id: Self::FromId) -> Result<Self::ToId> {
+//         unimplemented!();
+//     }
+// }
+// 
+// impl LookupId for ExitAdapter {
+//     type FromId = usize;
+//     type ToId = String;
 // 
 //     fn lookup_id(&self, id: Self::FromId) -> Result<Self::ToId> {
 //         unimplemented!();
 //     }
 // }
-// 
-// 
-// impl<S, SrcId, PipeId, SrcVal, PipeVal> Sample for SourceStage<S, SrcId, PipeId, SrcVal, PipeVal> {
-//     type Id = PipeId;
-//     type Value = PipeVal;
-// 
-//     fn sample(&self, ids: &Vec<Self::Id>, times: &SimTimeRange) -> Result<CycleValues<Self::Value>> {
-//         unimplemented!();
-//     }
-// }
-// 
-// impl<S, SrcId, PipeId, SrcVal, PipeVal> Filter<PipeId, PipeVal, PipeVal> for SourceStage<S, SrcId, PipeId, SrcVal, PipeVal>
-// where
-//     S: Source<SrcId, SrcVal>,
-// {}
 
 
-//
-// ExitAdapter
-//
-
-pub struct ExitAdapter {}
-
-impl Transform for ExitAdapter {
-    type InValue = rug::Integer;
-    type OutValue = rug::Integer;
-
-    fn transform(&self, value: Self::InValue) -> Self::OutValue {
-        value
-    }
-}
-
-impl AssignId for ExitAdapter {
-    type FromId = String;
-    type ToId = usize;
-
-    fn assign_id(&mut self, id: Self::FromId) -> Result<Self::ToId> {
-        unimplemented!();
-    }
-}
-
-impl LookupId for ExitAdapter {
-    type FromId = usize;
-    type ToId = String;
-
-    fn lookup_id(&self, id: Self::FromId) -> Result<Self::ToId> {
-        unimplemented!();
-    }
-}
+pub type Pipeline<S> = Stage<S, usize, rug::Integer>;
 
 
 //
 // Pipeline stages
 //
 
-//enum StagePtr<S: Sized, PipeId, PipeVal> {
-    //Src(S),
-    //Fil(Box<Stage<S, PipeId, PipeVal>>)
-//}
-
-//pub struct Stage<S: Sized, PipeId, PipeVal> {
-    //filter: Box<dyn Filter<PipeId, PipeVal, PipeVal, IntoSignalIter = Vec<(PipeId, WaveFormat)>>>,
-    ////prev: Option<Box<Self>>
-    //prev: StagePtr<S, PipeId, PipeVal>
-//}
-
 pub enum Stage<S, PipeId, PipeVal> {
     Src(S),
-    Fil(Box<Stage<S, PipeId, PipeVal>>, Box<dyn Filter<PipeId, PipeVal, PipeVal, IntoSignalIter = Vec<(PipeId, WaveFormat)>>>)
+    Fil(Box<Stage<S, PipeId, PipeVal>>, Box<dyn Filter<PipeId, PipeVal, PipeVal, IntoSignalIter = Vec<Signal<PipeId>>>>)
 }
+
+
+impl<S, PipeId, PipeVal> Stage<S, PipeId, PipeVal> {
+    pub fn new(source: S) -> Self {
+        Self::Src(source)
+    }
+}
+
 
 impl<S, SrcId, PipeId, PipeVal> QuerySource for Stage<S, PipeId, PipeVal>
     where
         S: QuerySource<Id = SrcId> + LookupId<FromId = SrcId, ToId = PipeId>
 {
     type Id = PipeId;
-    type IntoSignalIter = Vec<(Self::Id, WaveFormat)>;
+    type IntoSignalIter = Vec<Signal<Self::Id>>;
 
-    // FIXME how to solve recursion to source
+    // how to solve recursion to source?
     // The approache with SourceStage as Filter is shit. It requires tons of impls and useless
     // boilerplate code. Instead, I can turn `prev` into an enum with three(two?) variants: (None),
     // Filter-stage, Source. Then source would get a special code path in recursion functions and
@@ -279,8 +144,13 @@ impl<S, SrcId, PipeId, PipeVal> QuerySource for Stage<S, PipeId, PipeVal>
         match self {
             Self::Fil(ref prev, ref filter) => {
                 let prev_signals = prev.query_signals()?;
-                let translated_res: Result<Vec<_>> = prev_signals.iter()
-                    .map(|(signal, format)| Ok((filter.translate_signal(signal)?, format.clone())))
+                let translated_res: Result<Vec<_>> = prev_signals.into_iter()
+                    .map(|signal| {
+                        Ok( Signal {
+                            id: filter.translate_signal(&signal.id)?,
+                            ..signal
+                        } )
+                    })
                     .collect();
                 translated = translated_res?;
                 
@@ -291,7 +161,12 @@ impl<S, SrcId, PipeId, PipeVal> QuerySource for Stage<S, PipeId, PipeVal>
             Self::Src(ref src) => {
                 let src_signals = src.query_signals()?;
                 let translated_res: Result<Vec<_>> = src_signals.into_iter()
-                    .map(|(signal, format)| Ok((src.lookup_id(signal)?, format.clone())))
+                    .map(|signal| Ok(
+                        Signal {
+                            id: src.lookup_id(&signal.id)?,
+                            name: signal.name,
+                            format: signal.format
+                        }))
                     .collect();
                 translated = translated_res?;
             }
@@ -301,7 +176,44 @@ impl<S, SrcId, PipeId, PipeVal> QuerySource for Stage<S, PipeId, PipeVal>
     }
 
     fn query_time(&self) -> Result<SimTimeRange> {
-        unimplemented!();
+        match self {
+            Self::Fil(ref prev, _) => {
+                prev.query_time()
+            }
+
+            Self::Src(ref src) => {
+                src.query_time()
+            }
+        }
     }
 }
+
+
+impl<S, SrcId, PipeId, PipeVal> Sample for Stage<S, PipeId, PipeVal>
+where
+    S: LookupId<FromId = SrcId, ToId = PipeId> + Sample<Id = SrcId, Value = PipeVal>
+{
+    type Id = PipeId;
+    type Value = PipeVal;
+
+    fn sample(&self, ids: &Vec<Self::Id>, times: &SimTimeRange) -> Result<CycleValues<Self::Value>> {
+        match self {
+            Self::Fil(ref prev, ref filter) => {
+                unimplemented!();
+            }
+
+            Self::Src(ref src) => {
+                let src_ids: Result<Vec<_>> = ids.iter()
+                    .map(|id| src.rev_lookup_id(id))
+                    .collect();
+                let src_ids = src_ids?;
+                let src_vals = src.sample(&src_ids, times)?;
+
+                Ok(src_vals)
+            }
+        }
+    }
+}
+
+
 

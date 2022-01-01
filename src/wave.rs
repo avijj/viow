@@ -51,20 +51,22 @@ impl<S> Wave<S>
         }
     }*/
 
-    pub fn load_new(source: S, source_adapter: SourceAdapter, exit_adapter: ExitAdapter) -> Result<Self> {
-        let pipe = Pipeline::new(source, source_adapter, exit_adapter);
+    pub fn load_new(source: S) -> Result<Self> {
+        let pipe = Pipeline::new(source);
         let signals = pipe.query_signals()?;
+        let mut ids = Vec::with_capacity(signals.len());
         let mut names = Vec::with_capacity(signals.len());
         let mut formatters = Vec::with_capacity(signals.len());
 
         for signal in signals {
-            let (name, format) = signal;
+            let Signal { id, name, format } = signal;
+            ids.push(id);
             names.push(name);
             formatters.push(format);
         }
 
         let times = pipe.query_time()?;
-        let data = pipe.sample(&names, &times)?;
+        let data = pipe.sample(&ids, &times)?;
 
         Ok(Self {
             data,

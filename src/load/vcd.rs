@@ -215,11 +215,15 @@ impl LoadWaveform for VcdLoader {
 
 impl QuerySource for VcdLoader {
     type Id = String;
-    type IntoSignalIter = Vec<(Self::Id, WaveFormat)>;
+    type IntoSignalIter = Vec<Signal<Self::Id>>;
 
     fn query_signals(&self) -> Result<Self::IntoSignalIter> {
         let rv: Self::IntoSignalIter = self.signals.iter()
-            .map(|decl| (decl.name.clone(), decl.format.clone()))
+            .map(|decl| Signal {
+                id: decl.name.clone(),
+                name: decl.name.clone(),
+                format: decl.format.clone()
+            })
             .collect();
 
         Ok(rv)
@@ -237,13 +241,21 @@ impl LookupId for VcdLoader {
     type FromId = String;
     type ToId = usize;
 
-    fn lookup_id(&self, id: Self::FromId) -> Result<Self::ToId> {
+    fn lookup_id(&self, id: &Self::FromId) -> Result<Self::ToId> {
         let pos = self.signals.iter()
-            .position(|x| x.name == id);
+            .position(|x| x.name == *id);
 
         match pos {
             Some(p) => Ok(p),
-            None => Err(Error::NotFound(id))
+            None => Err(Error::NotFound(id.clone()))
+        }
+    }
+
+    fn rev_lookup_id(&self, id: &Self::ToId) -> Result<Self::FromId> {
+        if *id < self.signals.len() {
+            Ok(self.signals[*id].name.clone())
+        } else {
+            Err(Error::IdOutOfRange(*id, self.signals.len()-1))
         }
     }
 }
@@ -254,7 +266,7 @@ impl Sample for VcdLoader {
 
     fn sample(&self, ids: &Vec<Self::Id>, times: &SimTimeRange) -> Result<CycleValues<Self::Value>> {
         let start_cycle = (times.0 / self.cycle_time) as usize;
-        let stop_cycle = (times.1 / self.cycle_time) as usize + 1;
+        let stop_cycle = (times.1 / self.cycle_time) as usize;
 
         let mut data = Array2::default((stop_cycle - start_cycle, ids.len()));
         for (i, id) in ids.iter().enumerate() {
