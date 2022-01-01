@@ -8,6 +8,6 @@ impl<T> Transform for Identity<T>
 {
     type Value = T;
 
-    fn transform(&self, value: &mut T) {
+    fn transform(&self, _: &mut T) {
     }
 }

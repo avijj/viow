@@ -2,7 +2,7 @@ use super::*;
 use crate::formatting::WaveFormat;
 use crate::data::*;
 
-use rug::{Assign,integer::Order};
+use rug::Assign;
 use std::path::Path;
 use std::fs::File;
 use std::collections::HashMap;

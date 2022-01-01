@@ -15,7 +15,6 @@ use scripts::{
     lua::LuaInterpreter
 };
 use data::{SimTime, SimTimeUnit};
-use pipeline::*;
 
 use anyhow::Result;
 use tui::Terminal;

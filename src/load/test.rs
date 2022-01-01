@@ -6,7 +6,7 @@ pub struct TestLoader {
 }
 
 impl TestLoader {
-    pub fn new(num_signals: usize, num_cycles: usize) -> Self {
+    pub fn _new(num_signals: usize, num_cycles: usize) -> Self {
         Self {
             num_cycles,
             num_signals,

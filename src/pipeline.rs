@@ -1,6 +1,5 @@
 use crate::data::*;
 use crate::error::*;
-use crate::formatting::WaveFormat;
 
 pub type Pipeline<S> = Stage<S, usize, rug::Integer>;
 
@@ -42,7 +41,7 @@ where
     // Filter-stage, Source. Then source would get a special code path in recursion functions and
     // only needs to implement a minimal set of traits instead of full Filter.
     fn query_signals(&self) -> Result<Self::IntoSignalIter> {
-        let mut translated;
+        let translated;
 
         match self {
             Self::Fil(ref prev, ref filter) => {
@@ -116,3 +115,4 @@ where
         }
     }
 }
+

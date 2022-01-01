@@ -59,15 +59,15 @@ impl SimTime {
         Self::new(v, SimTimeUnit::Ps)
     }
 
-    pub fn from_ns(v: u64) -> Self {
+    pub fn _from_ns(v: u64) -> Self {
         Self::new(v, SimTimeUnit::Ns)
     }
 
-    pub fn get_value(&self) -> u64 {
+    pub fn _get_value(&self) -> u64 {
         self.value
     }
 
-    pub fn get_unit(&self) -> SimTimeUnit {
+    pub fn _get_unit(&self) -> SimTimeUnit {
         self.unit
     }
 
@@ -92,7 +92,7 @@ impl std::ops::Div<SimTime> for SimTime {
 
     fn div(self, rhs: SimTime) -> Self::Output {
         let r = Rational::from((self.to_bigint(), rhs.to_bigint()));
-        let (f, floor) = r.fract_floor(Integer::new());
+        let (_, floor) = r.fract_floor(Integer::new());
         floor.to_u64()
             .expect("Integer overflow in division")
     }
