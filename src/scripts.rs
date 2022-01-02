@@ -1,22 +1,15 @@
 pub mod lua;
 
+use crate::error::*;
 use crate::viewer;
+use crate::wave::Wave;
 
-use mlua;
-use thiserror::Error;
 
-#[derive(Error,Debug)]
-pub enum Error {
-    #[error("Error in Lua interpreter")]
-    LuaError(#[from] mlua::Error),
-
-    #[error("No command specified")]
-    NoCommand,
+pub struct ScriptState {
+    pub ui: viewer::State,
+    pub wv: Wave,
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
-
-
 pub trait RunCommand {
-    fn run_command(&mut self, state: &mut viewer::State, command: String) -> Result<()>;
+    fn run_command(&mut self, state: ScriptState, command: String) -> Result<ScriptState>;
 }

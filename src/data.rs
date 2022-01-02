@@ -44,12 +44,6 @@ pub trait Sample {
     type Id;
     type Value;
 
-    //fn sample(
-    //&self,
-    //ids: impl IntoIterator<Item = &'a Self::Id>,
-    //times: impl AsRef<SimTimeRange>,
-    //) -> Result<CycleValues<Self::Value>>;
-
     // Need concrete types as arguments, because of use as trait object.
     fn sample(&self, ids: &Vec<Self::Id>, times: &SimTimeRange)
         -> Result<CycleValues<Self::Value>>;
@@ -69,7 +63,11 @@ pub trait TranslateSignals<I> {
     fn rev_translate_ids(&self, signals: Self::IntoIdIter) -> Result<Self::IntoIdIter>;
 }
 
-pub trait Source<Id, V>: QuerySource<Id = Id> + Sample<Id = Id, Value = V> {}
+pub trait Source<I, J, V>:
+    QuerySource<Id = I>
+    + Sample<Id = I, Value = V>
+    + LookupId<FromId = I, ToId = J>
+{}
 
 pub trait Filter<I, V>:
     Transform<Value = V>

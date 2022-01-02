@@ -278,5 +278,5 @@ impl Sample for VcdLoader {
     }
 }
 
-impl Source<String, Integer> for VcdLoader {}
+impl Source<String, usize, Integer> for VcdLoader {}
 

@@ -1,16 +1,19 @@
+pub mod filter;
+
 use crate::data::*;
 use crate::error::*;
 
-pub type Pipeline<S> = Stage<S, usize, rug::Integer>;
+pub type Pipeline = Stage<String, usize, rug::Integer>;
+pub type SrcBox = Box<dyn Source<String, usize, rug::Integer, IntoSignalIter = Vec<Signal<String>>>>;
 
 //
 // Pipeline stages
 //
 
-pub enum Stage<S, PipeId, PipeVal> {
-    Src(S),
+pub enum Stage<SrcId, PipeId, PipeVal> {
+    Src(Box<dyn Source<SrcId, PipeId, PipeVal, IntoSignalIter = Vec<Signal<SrcId>>>>),
     Fil(
-        Box<Stage<S, PipeId, PipeVal>>,
+        Box<Stage<SrcId, PipeId, PipeVal>>,
         Box<
             dyn Filter<
                 PipeId,
@@ -22,16 +25,29 @@ pub enum Stage<S, PipeId, PipeVal> {
     ),
 }
 
-impl<S, PipeId, PipeVal> Stage<S, PipeId, PipeVal> {
-    pub fn new(source: S) -> Self {
+impl<SrcId, PipeId, PipeVal> Stage<SrcId, PipeId, PipeVal> {
+    pub fn new(source: Box<dyn Source<SrcId, PipeId, PipeVal, IntoSignalIter = Vec<Signal<SrcId>>>>) -> Self {
         Self::Src(source)
+    }
+
+    pub fn push(self, stage: Box<dyn Filter< PipeId, PipeVal, IntoSigIter = Vec<Signal<PipeId>>, IntoIdIter = Vec<PipeId> >>) -> Self {
+        Self::Fil(Box::new(self), stage)
+    }
+
+    pub fn pop(self) -> Option<(Self, Box<dyn Filter< PipeId, PipeVal, IntoSigIter = Vec<Signal<PipeId>>, IntoIdIter = Vec<PipeId> >>)> {
+        match self {
+            Self::Fil(prev, filter) => {
+                Some((*prev, filter))
+            }
+
+            Self::Src(_) => {
+                None
+            }
+        }
     }
 }
 
-impl<S, SrcId, PipeId, PipeVal> QuerySource for Stage<S, PipeId, PipeVal>
-where
-    S: QuerySource<Id = SrcId> + LookupId<FromId = SrcId, ToId = PipeId>,
-{
+impl<SrcId, PipeId, PipeVal> QuerySource for Stage<SrcId, PipeId, PipeVal> {
     type Id = PipeId;
     type IntoSignalIter = Vec<Signal<Self::Id>>;
 
@@ -81,10 +97,9 @@ where
     }
 }
 
-impl<S, SrcId, PipeId, PipeVal> Sample for Stage<S, PipeId, PipeVal>
+impl<SrcId, PipeId, PipeVal> Sample for Stage<SrcId, PipeId, PipeVal>
 where
     PipeId: Clone,
-    S: LookupId<FromId = SrcId, ToId = PipeId> + Sample<Id = SrcId, Value = PipeVal>,
 {
     type Id = PipeId;
     type Value = PipeVal;

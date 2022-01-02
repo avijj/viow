@@ -18,3 +18,4 @@ thiserror = "1.0"
 anyhow = "1.0"
 clap = { version = "3.0.0-beta.5", features = [ "derive" ] }
 mlua = { version = "0.6", features = [ "lua54" ] }
+regex = "1"

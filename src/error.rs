@@ -1,4 +1,7 @@
 use std::ops::Range;
+use std::sync::Arc;
+use mlua;
+use regex;
 use thiserror::Error;
 
 #[derive(Error,Debug)]
@@ -17,7 +20,23 @@ pub enum Error {
 
     #[error("The given text '{0:}' can not be interpreted as time.")]
     InvalidTime(String),
+
+    #[error("Regex error")]
+    RegexErr(#[from] regex::Error),
+
+    #[error("Error in Lua interpreter")]
+    LuaError(#[from] mlua::Error),
+
+    #[error("No command specified")]
+    NoCommand,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+
+
+impl From<Error> for mlua::Error {
+    fn from(err: Error) -> Self {
+        mlua::Error::ExternalError(Arc::new(err))
+    }
+}

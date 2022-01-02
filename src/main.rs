@@ -7,11 +7,12 @@ mod viewer;
 mod data;
 mod pipeline;
 
+use error::*;
 use wave::Wave;
 use viewer::*;
-//use load::test::TestLoader;
 use load::vcd::VcdLoader;
 use scripts::{
+    ScriptState, RunCommand,
     lua::LuaInterpreter
 };
 use data::{SimTime, SimTimeUnit};
@@ -40,10 +41,13 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
     //let loader = TestLoader::new(200, 2000);
     let opt_timeunits = opts.timeunits.trim().to_lowercase();
     let cycle_time = SimTime::new(opts.clock_period, SimTimeUnit::from_string(opt_timeunits)?);
-    let loader = VcdLoader::new(PathBuf::from(opts.input), cycle_time)?;
-    let wave = Wave::load_new(loader)?;
-    let mut state = State::new();
+    let loader = Box::new(VcdLoader::new(PathBuf::from(opts.input), cycle_time)?);
+    let wave = Wave::load(loader)?;
     //let mut interpreter = LuaInterpreter::new(state, wave);
+    let mut state = ScriptState {
+        ui: State::new(), 
+        wv: wave,
+    };
     let mut interpreter = LuaInterpreter::new();
 
     loop {
@@ -61,16 +65,16 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
 
             //let state = interpreter.state_mut();
             //let wave = interpreter.wave_mut();
-            state.resize(stack[0].width - 48, stack[0].height - 2);
-            state.data_size(wave.num_signals(), wave.num_cycles());
+            state.ui.resize(stack[0].width - 48, stack[0].height - 2);
+            state.ui.data_size(state.wv.num_signals(), state.wv.num_cycles());
             
-            let table = build_table(&wave, &state);
-            f.render_stateful_widget(table, size, state.get_mut_table_state());
+            let table = build_table(&state.wv, &state.ui);
+            f.render_stateful_widget(table, size, state.ui.get_mut_table_state());
 
-            let statusline = build_statusline(&state);
+            let statusline = build_statusline(&state.ui);
             f.render_widget(statusline, stack[1]);
 
-            let commandline = build_commandline(&state);
+            let commandline = build_commandline(&state.ui);
             f.render_widget(commandline, stack[2]);
         })?;
 
@@ -79,18 +83,20 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
             let ev = event::read()?;
             //let state = interpreter.state_mut();
 
-            if state.in_command() {
+            if state.ui.in_command() {
                 match ev {
                     Event::Key(KeyEvent { code: KeyCode::Char(c), .. }) => {
-                        state.put_command(c);
+                        state.ui.put_command(c);
                     }
 
                     Event::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
-                        state.exec_command(&mut interpreter)?;
+                        let cmd = state.ui.pop_command()
+                            .ok_or(Error::NoCommand)?;
+                        state = interpreter.run_command(state, cmd)?;
                     }
 
                     Event::Key(KeyEvent { code: KeyCode::Backspace, .. }) => {
-                        state.take_command();
+                        state.ui.take_command();
                     }
 
                     _ => {}
@@ -104,56 +110,56 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
 
                     // down
                     Event::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
-                        state.move_cursor_down();
+                        state.ui.move_cursor_down();
                     }
 
                     // page down
                     Event::Key(KeyEvent { code: KeyCode::Char('J'), .. }) => {
-                        state.move_page_down();
+                        state.ui.move_page_down();
                     }
 
                     // up
                     Event::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
-                        state.move_cursor_up();
+                        state.ui.move_cursor_up();
                     }
                     
                     // page up
                     Event::Key(KeyEvent { code: KeyCode::Char('K'), .. }) => {
-                        state.move_page_up();
+                        state.ui.move_page_up();
                     }
                     
                     // left
                     Event::Key(KeyEvent { code: KeyCode::Char('h'), .. }) => {
-                        state.move_cursor_left();
+                        state.ui.move_cursor_left();
                     }
 
                     // page left
                     Event::Key(KeyEvent { code: KeyCode::Char('H'), .. }) => {
-                        state.move_page_left();
+                        state.ui.move_page_left();
                     }
 
                     // right
                     Event::Key(KeyEvent { code: KeyCode::Char('l'), .. }) => {
-                        state.move_cursor_right();
+                        state.ui.move_cursor_right();
                     }
 
                     // page right
                     Event::Key(KeyEvent { code: KeyCode::Char('L'), .. }) => {
-                        state.move_page_right();
+                        state.ui.move_page_right();
                     }
 
                     // zoom in '+'
                     Event::Key(KeyEvent { code: KeyCode::Char('+'), .. }) => {
-                        state.zoom_in();
+                        state.ui.zoom_in();
                     }
 
                     // zoom out '-'
                     Event::Key(KeyEvent { code: KeyCode::Char('-'), .. }) => {
-                        state.zoom_out();
+                        state.ui.zoom_out();
                     }
 
                     Event::Key(KeyEvent { code: KeyCode::Char(':'), .. }) => {
-                        state.start_command();
+                        state.ui.start_command();
                     }
 
                     _ => {}

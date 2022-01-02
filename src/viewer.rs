@@ -1,5 +1,5 @@
+use crate::error::*;
 use crate::scripts::RunCommand;
-use crate::scripts::Error as InterpError;
 use crate::formatting::build_waveform;
 use crate::wave::Wave;
 use crate::data::*;
@@ -254,19 +254,20 @@ impl State {
         }
     }
 
-    pub fn exec_command<I: RunCommand>(&mut self, interpreter: &mut I) -> Result<(), InterpError> {
-        let cmd = self.command.take()
-            .ok_or(InterpError::NoCommand)?;
-        interpreter.run_command(self, cmd)?;
-        Ok(())
+    pub fn pop_command(&mut self) -> Option<String> {
+        self.command.take()
     }
+
+    //pub fn exec_command<I: RunCommand>(&mut self, interpreter: &mut I) -> Result<()> {
+        //let cmd = self.command.take()
+            //.ok_or(Error::NoCommand)?;
+        //interpreter.run_command(self, cmd)?;
+        //Ok(())
+    //}
 }
 
 
-pub fn build_table<'a, S>(wave: &'a Wave<S>, state: &State) -> Table<'a> 
-    where
-        S: Source<String, rug::Integer> + LookupId<FromId = String, ToId = usize>
-{
+pub fn build_table<'a>(wave: &'a Wave, state: &State) -> Table<'a> {
     let even_style = Style::default()
         .fg(Color::Black)
         .bg(Color::White);
