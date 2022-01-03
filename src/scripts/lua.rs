@@ -15,10 +15,21 @@ pub struct LuaInterpreter {
 }
 
 impl LuaInterpreter {
-    pub fn new() -> Self {
-        Self {
-            lua: Lua::new()
-        }
+    pub fn new() -> Result<Self> {
+        let lua = Lua::new();
+        let load = lua.create_function_mut(|_, args: (String, u64, String)| {
+            let (filename, period, timeunit) = args;
+            let cycle_time = SimTime::new(period, SimTimeUnit::from_string(timeunit)?);
+            let loader = Box::new(VcdLoader::new(PathBuf::from(filename), cycle_time)?);
+            let new_wave = Wave::load(loader)?;
+            Ok(new_wave)
+        })?;
+
+        lua.globals().set("load", load)?;
+
+        Ok(Self {
+            lua
+        })
     }
 }
 
@@ -69,6 +80,18 @@ impl<'lua> FromLua<'lua> for Wave {
                 Ok(rv)
             }
 
+            Value::Error(err) => {
+                Err(err)
+            }
+
+            Value::Nil => {
+                Err(lua::Error::FromLuaConversionError { 
+                    from: "userdata",
+                    to: "Wave",
+                    message: Some("Expected value of type Wave, but found Nil".to_string())
+                })
+            }
+
             _ => {
                 Err(lua::Error::FromLuaConversionError { from: "userdata", to: "Wave", message: None })
             }
@@ -78,19 +101,8 @@ impl<'lua> FromLua<'lua> for Wave {
 
 impl RunCommand for LuaInterpreter {
     fn run_command(&mut self, mut state: ScriptState, command: String) -> Result<ScriptState> {
-        //let mut new_wave = None;
-
-        let load = self.lua.create_function_mut(|_, args: (String, u64, String)| {
-            let (filename, period, timeunit) = args;
-            let cycle_time = SimTime::new(period, SimTimeUnit::from_string(timeunit)?);
-            let loader = Box::new(VcdLoader::new(PathBuf::from(filename), cycle_time)?);
-            let new_wave = Wave::load(loader)?;
-            Ok(new_wave)
-        })?;
-
         self.lua.globals().set("view", View::new(&state.ui))?;
         self.lua.globals().set("wave", state.wv)?;
-        self.lua.globals().set("load", load)?;
 
         let chunk = self.lua.load(&command)
             .set_name("Command")?;

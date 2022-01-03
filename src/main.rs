@@ -48,7 +48,7 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
         ui: State::new(), 
         wv: wave,
     };
-    let mut interpreter = LuaInterpreter::new();
+    let mut interpreter = LuaInterpreter::new()?;
 
     loop {
         terminal.draw(|f| {
