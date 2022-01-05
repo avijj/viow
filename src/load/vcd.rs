@@ -73,6 +73,13 @@ impl VcdLoader {
                             let new_prefix = format!("{}{}.", prefix, sub_scope.identifier);
                             stack.push((new_prefix, &sub_scope.children));
                         }
+
+                        ScopeItem::Comment(comment) => {
+                            rv.push(SignalDeclaration {
+                                name: format!("-- {}", comment),
+                                format: WaveFormat::Comment,
+                            });
+                        }
                     }
                 }
             } else {

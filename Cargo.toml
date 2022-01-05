@@ -13,7 +13,8 @@ crossterm = "0.21"
 tui = { version = "0.16", default-features = false, features = [ "crossterm" ] }
 ndarray = "0.15"
 rug = "1.13"
-vcd = "0.6"
+#vcd = "0.6"
+vcd = { git = "https://github.com/kevinmehall/rust-vcd" }
 thiserror = "1.0"
 anyhow = "1.0"
 clap = { version = "3.0", features = [ "derive" ] }

@@ -4,6 +4,7 @@ use rug::Integer;
 pub enum WaveFormat {
     Bit,
     Vector,
+    Comment,
 }
 
 fn build_waveform_vec<'a, T>(line_data: T, zoom: usize) -> String 
@@ -28,6 +29,15 @@ fn build_waveform_bit<'a, T>(line_data: T, zoom: usize) -> String
         .collect()
 }
 
+fn build_waveform_comment<'a, T>(line_data: T, zoom: usize) -> String
+    where
+        T: Iterator<Item = &'a Integer>
+{
+    core::iter::repeat('.')
+        .take(zoom * line_data.count())
+        .collect()
+}
+
 pub fn build_waveform<'a, T>(line_data: T, format: WaveFormat, zoom: usize) -> String 
     where
         T: Iterator<Item = &'a Integer>
@@ -35,6 +45,7 @@ pub fn build_waveform<'a, T>(line_data: T, format: WaveFormat, zoom: usize) -> S
     match format {
         WaveFormat::Bit => build_waveform_bit(line_data, zoom),
         WaveFormat::Vector => build_waveform_vec(line_data, zoom),
+        WaveFormat::Comment => build_waveform_comment(line_data, zoom),
     }
 }
 
