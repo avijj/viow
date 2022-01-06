@@ -1,5 +1,5 @@
 use crate::error::*;
-use crate::formatting::{WaveFormat};
+use crate::formatting::WaveFormat;
 use crate::data::*;
 use crate::pipeline::*;
 
@@ -18,18 +18,20 @@ pub struct Wave
 impl Wave {
     pub fn load(source: SrcBox) -> Result<Self> {
         let pipe = Pipeline::new(source);
+        Self::load_from_pipe(pipe)
+    }
+
+    fn load_from_pipe(pipe: Stage<String, usize, Integer>) -> Result<Self> {
         let signals = pipe.query_signals()?;
         let mut ids = Vec::with_capacity(signals.len());
         let mut names = Vec::with_capacity(signals.len());
         let mut formatters = Vec::with_capacity(signals.len());
-
         for signal in signals {
             let Signal { id, name, format } = signal;
             ids.push(id);
             names.push(name);
             formatters.push(format);
         }
-
         let times = pipe.query_time()?;
         let data = pipe.sample(&ids, &times)?;
 
@@ -75,7 +77,19 @@ impl Wave {
             .get(signal_index)
             .map(|s| s.as_str())
     }
+
+    pub fn push_filter(self, filter: FilterBox) -> Result<Self> {
+        Self::load_from_pipe(self.pipe.push(filter))
+    }
+
+    pub fn pop_filter(self) -> Result<(Self, Option<FilterBox>)> {
+        let (pipe, filter) = self.pipe.pop();
+        let new_self = Self::load_from_pipe(pipe)?;
+
+        Ok((new_self, filter))
+    }
 }
+
 
 
 pub struct SliceIter<'a> {

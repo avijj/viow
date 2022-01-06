@@ -5,6 +5,7 @@ use crate::error::*;
 
 pub type Pipeline = Stage<String, usize, rug::Integer>;
 pub type SrcBox = Box<dyn Source<String, usize, rug::Integer, IntoSignalIter = Vec<Signal<String>>>>;
+pub type FilterBox = Box<dyn Filter<usize, rug::Integer, IntoSigIter = Vec<Signal<usize>>, IntoIdIter = Vec<usize>>>;
 
 //
 // Pipeline stages
@@ -34,14 +35,14 @@ impl<SrcId, PipeId, PipeVal> Stage<SrcId, PipeId, PipeVal> {
         Self::Fil(Box::new(self), stage)
     }
 
-    pub fn pop(self) -> Option<(Self, Box<dyn Filter< PipeId, PipeVal, IntoSigIter = Vec<Signal<PipeId>>, IntoIdIter = Vec<PipeId> >>)> {
+    pub fn pop(self) -> (Self, Option<Box<dyn Filter< PipeId, PipeVal, IntoSigIter = Vec<Signal<PipeId>>, IntoIdIter = Vec<PipeId> >>>) {
         match self {
             Self::Fil(prev, filter) => {
-                Some((*prev, filter))
+                (*prev, Some(filter))
             }
 
             Self::Src(_) => {
-                None
+                (self, None)
             }
         }
     }

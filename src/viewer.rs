@@ -1,8 +1,5 @@
-use crate::error::*;
-use crate::scripts::RunCommand;
 use crate::formatting::build_waveform;
 use crate::wave::Wave;
-use crate::data::*;
 
 use tui::widgets::TableState;
 use tui::widgets::{ Table, Row, Cell, Paragraph };
@@ -87,7 +84,7 @@ impl State {
         }
 
         if x >= self.data_cols {
-            self.cur_wave_col = self.data_cols - 1;
+            self.cur_wave_col = self.data_cols.saturating_sub(1);
             self.left_wave_col = self.data_cols.saturating_sub(1 + self.wave_cols);
         } else {
             self.cur_wave_col = x;
@@ -105,10 +102,14 @@ impl State {
             self.top_wave_row = x.saturating_sub(self.wave_rows);
             self.table_state.select(Some(self.cur_wave_row - self.top_wave_row));
         } else {
-            let last_row = std::cmp::min(self.wave_rows, self.data_rows) - 1;
+            let num_rows = std::cmp::min(self.wave_rows, self.data_rows);
 
-            self.table_state.select(Some(last_row));
-            self.cur_wave_row = self.data_rows - 1;
+            if num_rows > 0 {
+                self.table_state.select(Some(num_rows - 1));
+            } else {
+                self.table_state.select(None);
+            }
+            self.cur_wave_row = self.data_rows.saturating_sub(1);
             self.top_wave_row = self.data_rows.saturating_sub(self.wave_rows);
         }
     }

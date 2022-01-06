@@ -1,3 +1,5 @@
+mod api;
+
 use super::*;
 use crate::viewer;
 use crate::data::*;
@@ -19,15 +21,15 @@ pub struct LuaInterpreter {
 impl LuaInterpreter {
     pub fn new() -> Result<Self> {
         let lua = Lua::new();
-        let load = lua.create_function_mut(|_, args: (String, u64, String)| {
-            let (filename, period, timeunit) = args;
-            let cycle_time = SimTime::new(period, SimTimeUnit::from_string(timeunit)?);
-            let loader = Box::new(VcdLoader::new(PathBuf::from(filename), cycle_time)?);
-            let new_wave = Wave::load(loader)?;
-            Ok(new_wave)
-        })?;
 
+        let load = lua.create_function(api::load_wave)?;
         lua.globals().set("load_vcd", load)?;
+
+        let filter_signals = lua.create_function(api::filter_signals)?;
+        lua.globals().set("filter_signals", filter_signals)?;
+
+        let grep = lua.create_function(api::grep)?;
+        lua.globals().set("grep", grep)?;
 
         Ok(Self {
             lua
