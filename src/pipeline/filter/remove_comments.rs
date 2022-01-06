@@ -5,34 +5,22 @@ use crate::error::*;
 use crate::data::*;
 use crate::formatting::WaveFormat;
 
-pub struct Grep {
-    re: Regex,
-}
+pub struct RemoveComments { }
 
-impl Grep {
-    pub fn new(expression: &str) -> Result<Self> {
-        let re = Regex::new(expression)?;
-
-        Ok(Self {
-            re
-        })
+impl RemoveComments {
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
 
-impl<I> TranslateSignals<I> for Grep {
+impl<I> TranslateSignals<I> for RemoveComments {
     type IntoSigIter = Vec<Signal<I>>;
     type IntoIdIter = Vec<I>;
 
     fn translate_signals(&self, signals: Self::IntoSigIter) -> Result<Self::IntoSigIter> {
         let filtered_signals = signals.into_iter()
-            .filter(|signal| {
-                if signal.format == WaveFormat::Comment {
-                    true
-                } else {
-                    self.re.is_match(&signal.name)
-                }
-            })
+            .filter(|signal| signal.format != WaveFormat::Comment)
             .collect();
 
         Ok(filtered_signals)
@@ -44,11 +32,11 @@ impl<I> TranslateSignals<I> for Grep {
 }
 
 
-impl Transform for Grep {
+impl Transform for RemoveComments {
     type Value = rug::Integer;
 
     fn transform(&self, _: &mut Self::Value) {
     }
 }
 
-impl<I> Filter<I, rug::Integer> for Grep {}
+impl<I> Filter<I, rug::Integer> for RemoveComments {}

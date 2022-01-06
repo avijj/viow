@@ -29,3 +29,16 @@ pub(super) fn grep<'callback>(_lua: &'callback Lua, args: (Wave, String)) -> mlu
 
     Ok(wave)
 }
+
+pub(super) fn remove_comments<'callback>(_lua: &'callback Lua, wave: Wave) -> mlua::Result<Wave>
+{
+    let filter = Box::new(filter::RemoveComments::new());
+    let wave = wave.push_filter(filter)?;
+
+    Ok(wave)
+}
+
+pub(super) fn pop<'callback>(_lua: &'callback Lua, wave: Wave) -> mlua::Result<Wave> {
+    let (wave, _) = wave.pop_filter()?;
+    Ok(wave)
+}

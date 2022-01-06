@@ -31,6 +31,12 @@ impl LuaInterpreter {
         let grep = lua.create_function(api::grep)?;
         lua.globals().set("grep", grep)?;
 
+        let remove_comments = lua.create_function(api::remove_comments)?;
+        lua.globals().set("remove_comments", remove_comments)?;
+
+        let pop = lua.create_function(api::pop)?;
+        lua.globals().set("pop_filter", pop)?;
+
         Ok(Self {
             lua
         })
