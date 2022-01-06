@@ -6,6 +6,12 @@ use thiserror::Error;
 
 #[derive(Error,Debug)]
 pub enum Error {
+    #[error("Command line argument {0:} is required: {1:}")]
+    MissingArgument(String, String),
+
+    #[error("Do not know how to load '{0:}'")]
+    UnknownFileFormat(String),
+
     #[error("IO error")]
     IoError(#[from] std::io::Error),
 
@@ -24,7 +30,7 @@ pub enum Error {
     #[error("Regex error")]
     RegexErr(#[from] regex::Error),
 
-    #[error("Error in Lua interpreter")]
+    #[error("Error in Lua interpreter: {0:}")]
     LuaError(#[from] mlua::Error),
 
     #[error("No command specified")]

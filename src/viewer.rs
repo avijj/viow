@@ -123,7 +123,7 @@ impl State {
     }
 
     pub fn move_cursor_right(&mut self) {
-        if self.cur_wave_col < self.data_cols - 1 {
+        if self.cur_wave_col + 1 < self.data_cols {
             if self.cur_wave_col == self.left_wave_col + self.wave_cols - 1 {
                 self.left_wave_col += 1;
             }
@@ -151,12 +151,12 @@ impl State {
 
     pub fn move_cursor_down(&mut self) {
         if let Some(sel) = self.table_state.selected() {
-            let last_row = std::cmp::min(self.wave_rows, self.data_rows) - 1;
+            let num_rows = std::cmp::min(self.wave_rows, self.data_rows);
 
-            if sel < last_row {
+            if sel + 1 < num_rows {
                 self.table_state.select(Some(sel+1));
                 self.cur_wave_row += 1;
-            } else if self.cur_wave_row < self.data_rows - 1 {
+            } else if self.cur_wave_row + 1 < self.data_rows {
                 self.top_wave_row += 1;
                 self.cur_wave_row += 1;
             }

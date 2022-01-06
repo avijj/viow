@@ -7,7 +7,9 @@ use mlua::{
     self as lua,
     Lua,Value,FromLua,UserData,UserDataFields
 };
+use std::fs::File;
 
+use std::io::Read;
 use std::path::PathBuf;
 
 pub struct LuaInterpreter {
@@ -25,11 +27,19 @@ impl LuaInterpreter {
             Ok(new_wave)
         })?;
 
-        lua.globals().set("load", load)?;
+        lua.globals().set("load_vcd", load)?;
 
         Ok(Self {
             lua
         })
+    }
+
+    pub fn run_file(&mut self, state: ScriptState, filename: impl AsRef<str>) -> Result<ScriptState> {
+        let mut file = File::open(filename.as_ref())?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+
+        self.run_command(state, contents)
     }
 }
 

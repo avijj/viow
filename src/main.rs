@@ -10,14 +10,14 @@ mod pipeline;
 use error::*;
 use wave::Wave;
 use viewer::*;
-use load::vcd::VcdLoader;
+use load::{ vcd::VcdLoader, empty::EmptyLoader };
 use scripts::{
     ScriptState, RunCommand,
     lua::LuaInterpreter
 };
 use data::{SimTime, SimTimeUnit};
 
-use anyhow::Result;
+//use anyhow::Result;
 use tui::Terminal;
 use tui::backend::CrosstermBackend;
 use tui::layout::{ Layout, Constraint, Direction };
@@ -37,19 +37,7 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
-    //let wave = Wave::new();
-    //let loader = TestLoader::new(200, 2000);
-    let opt_timeunits = opts.timeunits.trim().to_lowercase();
-    let cycle_time = SimTime::new(opts.clock_period, SimTimeUnit::from_string(opt_timeunits)?);
-    let loader = Box::new(VcdLoader::new(PathBuf::from(opts.input), cycle_time)?);
-    let wave = Wave::load(loader)?;
-    //let mut interpreter = LuaInterpreter::new(state, wave);
-    let mut state = ScriptState {
-        ui: State::new(), 
-        wv: wave,
-    };
-    let mut interpreter = LuaInterpreter::new()?;
-
+    let (mut state, mut interpreter) = setup(opts)?;
     loop {
         terminal.draw(|f| {
             let size = f.size();
@@ -171,6 +159,40 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
     Ok(())
 }
 
+fn setup(opts: Opts) -> Result<(ScriptState, LuaInterpreter)> {
+    if opts.input.ends_with(".vcd") {
+        let clock_period = opts.clock_period
+            .ok_or(Error::MissingArgument("--clock_period".into(), "Required to load a vcd file".into()))?;
+        let opt_timeunits = opts.timeunits.trim().to_lowercase();
+        let cycle_time = SimTime::new(clock_period, SimTimeUnit::from_string(opt_timeunits)?);
+        let loader = Box::new(VcdLoader::new(PathBuf::from(opts.input), cycle_time)?);
+        let wave = Wave::load(loader)?;
+
+        //let mut interpreter = LuaInterpreter::new(state, wave);
+        let state = ScriptState {
+            ui: State::new(), 
+            wv: wave,
+        };
+        let interpreter = LuaInterpreter::new()?;
+
+        Ok((state, interpreter))
+    } else if opts.input.ends_with(".lua") {
+        let loader = Box::new(EmptyLoader::new());
+        let wave = Wave::load(loader)?;
+
+        let state = ScriptState {
+            ui: State::new(), 
+            wv: wave,
+        };
+        let mut interpreter = LuaInterpreter::new()?;
+        let state = interpreter.run_file(state, opts.input)?;
+
+        Ok((state, interpreter))
+    } else {
+        Err(Error::UnknownFileFormat(opts.input.clone()))
+    }
+}
+
 
 /// Display a wave file in the console.
 #[derive(Parser)]
@@ -180,10 +202,10 @@ struct Opts {
 
     /// Clock period in number of timeunits to sample displayed data
     #[clap(short, long)]
-    clock_period: u64,
+    clock_period: Option<u64>,
 
     /// Timeunits to use to interpret times given in arguments
-    #[clap(short, long)]
+    #[clap(short, long, default_value = "ps")]
     timeunits: String,
 }
 

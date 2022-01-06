@@ -1,5 +1,6 @@
 pub mod test;
 pub mod vcd;
+pub mod empty;
 
 use crate::error::*;
 use crate::formatting::WaveFormat;
