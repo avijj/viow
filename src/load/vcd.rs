@@ -76,7 +76,7 @@ impl VcdLoader {
 
                         ScopeItem::Comment(comment) => {
                             rv.push(SignalDeclaration {
-                                name: format!("-- {}", comment),
+                                name: format!("-- {}: {}", prefix.strip_suffix(".").unwrap_or(""), comment),
                                 format: WaveFormat::Comment,
                             });
                         }
