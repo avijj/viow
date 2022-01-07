@@ -10,9 +10,15 @@ use mlua::{
     Lua,Value,FromLua,UserData,UserDataFields
 };
 use std::fs::File;
-
 use std::io::Read;
 use std::path::PathBuf;
+use std::stringify;
+
+macro_rules! add_global_function {
+    ($lua:expr, $name:ident) => {
+        $lua.globals().set(stringify!($name), $lua.create_function(api::$name)?)?;
+    }
+}
 
 pub struct LuaInterpreter {
     lua: Lua,
@@ -22,20 +28,12 @@ impl LuaInterpreter {
     pub fn new() -> Result<Self> {
         let lua = Lua::new();
 
-        let load = lua.create_function(api::load_wave)?;
-        lua.globals().set("load_vcd", load)?;
-
-        let filter_signals = lua.create_function(api::filter_signals)?;
-        lua.globals().set("filter_signals", filter_signals)?;
-
-        let grep = lua.create_function(api::grep)?;
-        lua.globals().set("grep", grep)?;
-
-        let remove_comments = lua.create_function(api::remove_comments)?;
-        lua.globals().set("remove_comments", remove_comments)?;
-
-        let pop = lua.create_function(api::pop)?;
-        lua.globals().set("pop_filter", pop)?;
+        add_global_function!(lua, load_vcd);
+        add_global_function!(lua, filter_signals);
+        add_global_function!(lua, grep);
+        add_global_function!(lua, remove_comments);
+        add_global_function!(lua, pop_filter);
+        add_global_function!(lua, replace_prefix);
 
         Ok(Self {
             lua
