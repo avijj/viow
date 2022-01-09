@@ -81,6 +81,10 @@ impl Wave {
             .map(|s| s.as_str())
     }
 
+    pub fn get_names(&self) -> &Vec<String> {
+        &self.names
+    }
+
     pub fn push_filter(self, filter: FilterBox) -> Result<Self> {
         Self::load_from_pipe(self.pipe.push(filter), self.config)
     }
@@ -102,6 +106,10 @@ impl Wave {
 
     pub fn reconfigure(&mut self) -> Result<()> {
         self.pipe.configure_pipeline(&self.config)
+    }
+
+    pub fn reload(self) -> Result<Self> {
+        Self::load_from_pipe(self.pipe, self.config)
     }
 }
 

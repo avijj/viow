@@ -23,6 +23,7 @@ pub type CycleValues<T> = Array2<T>;
 #[derive(Default)]
 pub struct PipelineConfig {
     pub name_list: Vec<String>,
+    pub enable_filter_list: bool,
 }
 
 //

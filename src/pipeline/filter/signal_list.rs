@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 pub struct SignalList {
     signals: HashMap<String, usize>,
+    enabled: bool,
 }
 
 impl SignalList {
@@ -16,7 +17,7 @@ impl SignalList {
             hash_set.insert(signal, i);
         }
 
-        Self { signals: hash_set }
+        Self { signals: hash_set, enabled: true }
     }
 }
 
@@ -25,6 +26,10 @@ impl<I> TranslateSignals<I> for SignalList {
     type IntoIdIter = Vec<I>;
 
     fn translate_signals(&self, signals: Self::IntoSigIter) -> Result<Self::IntoSigIter> {
+        if !self.enabled {
+            return Ok(signals);
+        }
+
         let mut filtered_signals: Vec<_> = signals
             .into_iter()
             // Assign sort keys to all elements
@@ -76,6 +81,8 @@ impl ConfigurePipeline for SignalList {
         for (i, signal) in config.name_list.iter().enumerate() {
             self.signals.insert(signal.clone(), i);
         }
+
+        self.enabled = config.enable_filter_list;
 
         Ok(())
     }

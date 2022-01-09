@@ -5,10 +5,11 @@ use tui::widgets::TableState;
 use tui::widgets::{ List, ListItem, Table, Row, Cell, Paragraph };
 use tui::layout::Constraint;
 use tui::style::{Style, Color, Modifier};
-use tui::text::{Spans, Span};
+use tui::text::{Text, Spans, Span};
 
 pub struct InsertState {
     prompt: String,
+    signals: Vec<String>,
 }
 
 pub enum Mode {
@@ -278,9 +279,10 @@ impl State {
         //Ok(())
     //}
     
-    pub fn start_insert_mode(&mut self) {
+    pub fn start_insert_mode(&mut self, signals: Vec<String>) {
         let m = InsertState {
             prompt: "".into(),
+            signals
         };
 
         self.mode = Mode::Insert(m);
@@ -409,16 +411,44 @@ pub fn build_commandline(state: &State) -> Paragraph {
     Paragraph::new(line_txt)
 }
 
-pub fn build_insert<'a>(wave: &'a Wave, state: &'a State) -> (List<'a>, List<'a>) {
+pub fn build_insert<'a>(wave: &'a Wave, state: &'a State) -> (List<'a>, List<'a>, Paragraph<'a>) {
     let name_list = &wave.get_config().name_list;
-    let mut items: Vec<_> = name_list.iter()
+    let items: Vec<_> = name_list.iter()
         .map(|name| ListItem::new(name.as_ref()))
         .collect();
 
-    if let Mode::Insert(ref insert_state) = state.mode {
-        let prompt = &insert_state.prompt;
-        items.push(ListItem::new(prompt.as_str()));
-    }
+    let prompt_line;
+    let suggestion_items: Vec<_>;
 
-    (List::new(items), List::new(vec![]))
+    if let Mode::Insert(ref insert_state) = state.mode {
+        prompt_line = Paragraph::new(Text::raw(&insert_state.prompt));
+        //suggestion_items = autocomplete(&insert_state.prompt, &insert_state.signals)
+        suggestion_items = insert_state.signals.iter()
+            .filter_map(|x| {
+                if x.contains(&insert_state.prompt) {
+                    Some(x.as_str())
+                } else {
+                    None
+                }
+            })
+            .map(|name| ListItem::new(name.clone()))
+            .collect();
+    } else {
+        prompt_line = Paragraph::new(Text::raw(""));
+        suggestion_items = vec![];
+    };
+
+    (List::new(items), List::new(suggestion_items), prompt_line)
 }
+
+
+//fn autocomplete<'a>(prompt: &'a str, options: &'a Vec<String>) -> impl Iterator<Item = &'a str> {
+    //options.iter()
+        //.filter_map(|x| {
+            //if x.contains(prompt) {
+                //Some(x.as_str())
+            //} else {
+                //None
+            //}
+        //})
+//}

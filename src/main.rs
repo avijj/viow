@@ -7,7 +7,7 @@ mod scripts;
 mod viewer;
 mod wave;
 
-use data::{SimTime, SimTimeUnit};
+use data::{SimTime, SimTimeUnit, QuerySource};
 use error::*;
 use load::{empty::EmptyLoader, vcd::VcdLoader};
 use scripts::{lua::LuaInterpreter, RunCommand, ScriptState};
@@ -203,7 +203,15 @@ fn event_loop_normal(
                 code: KeyCode::Char('i'),
                 ..
             }) => {
-                state.ui.start_insert_mode();
+                state.wv.get_config_mut().enable_filter_list = false;
+                state.wv.reconfigure()?;
+                state.wv = state.wv.reload()?;
+                let unfiltered = state.wv.get_names().clone();
+
+                state.wv.get_config_mut().enable_filter_list = true;
+                state.wv.reconfigure()?;
+                state.wv = state.wv.reload()?;
+                state.ui.start_insert_mode(unfiltered);
             }
 
             _ => {}
@@ -261,13 +269,15 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
                     .margin(0)
                     .constraints([
                         Constraint::Ratio(1, 3),
+                        Constraint::Length(1),
                         Constraint::Ratio(2, 3),
                     ])
                     .split(stack[0]);
 
-                let list = build_insert(&state.wv, &state.ui);
-                f.render_widget(list.0, substack[0]);
-                f.render_widget(list.1, substack[1]);
+                let (list, suggestions, prompt) = build_insert(&state.wv, &state.ui);
+                f.render_widget(list, substack[0]);
+                f.render_widget(prompt, substack[1]);
+                f.render_widget(suggestions, substack[2]);
             } else {
                 let table = build_table(&state.wv, &state.ui);
                 f.render_stateful_widget(table, size, state.ui.get_mut_table_state());
