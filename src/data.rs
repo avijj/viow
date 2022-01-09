@@ -20,6 +20,11 @@ pub struct Signal<I> {
 
 pub type CycleValues<T> = Array2<T>;
 
+#[derive(Default)]
+pub struct PipelineConfig {
+    pub name_list: Vec<String>,
+}
+
 //
 // Traits
 //
@@ -63,6 +68,12 @@ pub trait TranslateSignals<I> {
     fn rev_translate_ids(&self, signals: Self::IntoIdIter) -> Result<Self::IntoIdIter>;
 }
 
+pub trait ConfigurePipeline {
+    fn configure_pipeline(&mut self, _: &PipelineConfig) -> Result<()> {
+        Ok(())
+    }
+}
+
 pub trait Source<I, J, V>:
     QuerySource<Id = I>
     + Sample<Id = I, Value = V>
@@ -72,5 +83,6 @@ pub trait Source<I, J, V>:
 pub trait Filter<I, V>:
     Transform<Value = V>
     + TranslateSignals<I>
+    + ConfigurePipeline
 {
 }

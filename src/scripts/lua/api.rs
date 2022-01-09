@@ -12,10 +12,12 @@ pub(super) fn load_vcd<'callback>(_lua: &'callback Lua, args: (String, u64, Stri
 
 pub(super) fn filter_signals<'callback>(_lua: &'callback Lua, args: (Wave, Vec<String>)) -> mlua::Result<Wave>
 {
-    let (wave, signals) = args;
+    let (mut wave, signals) = args;
 
+    wave.get_config_mut().name_list = signals.clone();
     let filter = Box::new(filter::SignalList::new(signals));
-    let wave = wave.push_filter(filter)?;
+    let mut wave = wave.push_filter(filter)?;
+    wave.reconfigure()?;
 
     Ok(wave)
 }

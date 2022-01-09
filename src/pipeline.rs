@@ -132,3 +132,17 @@ where
     }
 }
 
+impl <SrcId, PipeId, PipeVal> ConfigurePipeline for Stage<SrcId, PipeId, PipeVal> {
+    fn configure_pipeline(&mut self, config: &PipelineConfig) -> Result<()> {
+        match self {
+            Self::Src(_) => {
+                Ok(())
+            }
+
+            Self::Fil(prev, filter) => {
+                filter.configure_pipeline(config)?;
+                prev.configure_pipeline(config)
+            }
+        }
+    }
+}

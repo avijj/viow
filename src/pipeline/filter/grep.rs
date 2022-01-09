@@ -51,4 +51,6 @@ impl Transform for Grep {
     }
 }
 
+impl ConfigurePipeline for Grep {}
+
 impl<I> Filter<I, rug::Integer> for Grep {}

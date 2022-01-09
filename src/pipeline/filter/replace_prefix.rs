@@ -48,5 +48,7 @@ impl Transform for ReplacePrefix {
     }
 }
 
+impl ConfigurePipeline for ReplacePrefix {}
+
 impl<I> Filter<I, rug::Integer> for ReplacePrefix {}
 

@@ -69,4 +69,16 @@ impl Transform for SignalList {
     fn transform(&self, _: &mut Self::Value) {}
 }
 
+impl ConfigurePipeline for SignalList {
+    fn configure_pipeline(&mut self, config: &PipelineConfig) -> Result<()> {
+        self.signals.clear();
+
+        for (i, signal) in config.name_list.iter().enumerate() {
+            self.signals.insert(signal.clone(), i);
+        }
+
+        Ok(())
+    }
+}
+
 impl<I> Filter<I, rug::Integer> for SignalList {}

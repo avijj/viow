@@ -13,15 +13,17 @@ pub struct Wave
     formatters: Vec<WaveFormat>,
     names: Vec<String>,
     pipe: Pipeline,
+    config: PipelineConfig,
 }
 
 impl Wave {
     pub fn load(source: SrcBox) -> Result<Self> {
         let pipe = Pipeline::new(source);
-        Self::load_from_pipe(pipe)
+        let config = PipelineConfig::default();
+        Self::load_from_pipe(pipe, config)
     }
 
-    fn load_from_pipe(pipe: Stage<String, usize, Integer>) -> Result<Self> {
+    fn load_from_pipe(pipe: Stage<String, usize, Integer>, config: PipelineConfig) -> Result<Self> {
         let signals = pipe.query_signals()?;
         let mut ids = Vec::with_capacity(signals.len());
         let mut names = Vec::with_capacity(signals.len());
@@ -40,6 +42,7 @@ impl Wave {
             formatters,
             names,
             pipe,
+            config,
         })
     }
 
@@ -79,14 +82,26 @@ impl Wave {
     }
 
     pub fn push_filter(self, filter: FilterBox) -> Result<Self> {
-        Self::load_from_pipe(self.pipe.push(filter))
+        Self::load_from_pipe(self.pipe.push(filter), self.config)
     }
 
     pub fn pop_filter(self) -> Result<(Self, Option<FilterBox>)> {
         let (pipe, filter) = self.pipe.pop();
-        let new_self = Self::load_from_pipe(pipe)?;
+        let new_self = Self::load_from_pipe(pipe, self.config)?;
 
         Ok((new_self, filter))
+    }
+
+    pub fn get_config(&self) -> &PipelineConfig {
+        &self.config
+    }
+
+    pub fn get_config_mut(&mut self) -> &mut PipelineConfig {
+        &mut self.config
+    }
+
+    pub fn reconfigure(&mut self) -> Result<()> {
+        self.pipe.configure_pipeline(&self.config)
     }
 }
 

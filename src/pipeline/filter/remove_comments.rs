@@ -39,4 +39,6 @@ impl Transform for RemoveComments {
     }
 }
 
+impl ConfigurePipeline for RemoveComments {}
+
 impl<I> Filter<I, rug::Integer> for RemoveComments {}
