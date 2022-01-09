@@ -14,6 +14,7 @@ tui = { version = "0.16", default-features = false, features = [ "crossterm" ] }
 ndarray = "0.15"
 rug = "1.13"
 #vcd = "0.6"
+#vcd = { git = "https://github.com/kevinmehall/rust-vcd" }
 vcd = { git = "https://github.com/kevinmehall/rust-vcd" }
 thiserror = "1.0"
 anyhow = "1.0"
