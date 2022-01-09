@@ -2,13 +2,24 @@ use crate::formatting::build_waveform;
 use crate::wave::Wave;
 
 use tui::widgets::TableState;
-use tui::widgets::{ Table, Row, Cell, Paragraph };
+use tui::widgets::{ List, ListItem, Table, Row, Cell, Paragraph };
 use tui::layout::Constraint;
 use tui::style::{Style, Color, Modifier};
 use tui::text::{Spans, Span};
 
+pub struct InsertState {
+    prompt: String,
+}
+
+pub enum Mode {
+    Normal,
+    Insert(InsertState),
+}
 
 pub struct State {
+    /// Interaction mode currently active
+    mode: Mode,
+
     /// Visible cols in waveform view
     wave_cols: usize,
 
@@ -46,6 +57,7 @@ pub struct State {
 impl State {
     pub fn new() -> Self {
         Self {
+            mode: Mode::Normal,
             wave_cols: 1,
             wave_rows: 1,
             data_cols: 0,
@@ -265,6 +277,47 @@ impl State {
         //interpreter.run_command(self, cmd)?;
         //Ok(())
     //}
+    
+    pub fn start_insert_mode(&mut self) {
+        let m = InsertState {
+            prompt: "".into(),
+        };
+
+        self.mode = Mode::Insert(m);
+    }
+
+    pub fn in_insert_mode(&self) -> bool {
+        match self.mode {
+            Mode::Insert(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn exit_insert_mode(&mut self) {
+        self.mode = Mode::Normal;
+    }
+
+    pub fn put_key(&mut self, c: char) {
+        match self.mode {
+            Mode::Insert(ref mut istate) => {
+                istate.prompt.push(c);
+            }
+
+            _ => { }
+        }
+    }
+
+    pub fn take_key(&mut self) -> Option<char> {
+        match self.mode {
+            Mode::Insert(ref mut istate) => {
+                istate.prompt.pop()
+            }
+
+            _ => {
+                None
+            }
+        }
+    }
 }
 
 
@@ -327,9 +380,15 @@ pub fn build_table<'a>(wave: &'a Wave, state: &State) -> Table<'a> {
 }
 
 pub fn build_statusline(state: &State) -> Paragraph {
+    let mode_txt = match state.mode {
+        Mode::Normal => "  NORMAL",
+        Mode::Insert(_) => "  INSERT",
+    };
+
     let line_txt = vec![
         Spans::from(vec![
-            Span::raw(format!("Cursor: {},{}", state.cur_wave_row, state.cur_wave_col))
+            Span::raw(format!("Cursor: {},{}", state.cur_wave_row, state.cur_wave_col)),
+            Span::raw(mode_txt),
         ])
     ];
 
@@ -350,3 +409,16 @@ pub fn build_commandline(state: &State) -> Paragraph {
     Paragraph::new(line_txt)
 }
 
+pub fn build_insert<'a>(wave: &'a Wave, state: &'a State) -> (List<'a>, List<'a>) {
+    let name_list = &wave.get_config().name_list;
+    let mut items: Vec<_> = name_list.iter()
+        .map(|name| ListItem::new(name.as_ref()))
+        .collect();
+
+    if let Mode::Insert(ref insert_state) = state.mode {
+        let prompt = &insert_state.prompt;
+        items.push(ListItem::new(prompt.as_str()));
+    }
+
+    (List::new(items), List::new(vec![]))
+}

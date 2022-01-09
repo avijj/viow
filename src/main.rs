@@ -1,36 +1,235 @@
+mod data;
 mod error;
-mod wave;
 mod formatting;
 mod load;
+mod pipeline;
 mod scripts;
 mod viewer;
-mod data;
-mod pipeline;
+mod wave;
 
-use error::*;
-use wave::Wave;
-use viewer::*;
-use load::{ vcd::VcdLoader, empty::EmptyLoader };
-use scripts::{
-    ScriptState, RunCommand,
-    lua::LuaInterpreter
-};
 use data::{SimTime, SimTimeUnit};
+use error::*;
+use load::{empty::EmptyLoader, vcd::VcdLoader};
+use scripts::{lua::LuaInterpreter, RunCommand, ScriptState};
+use viewer::*;
+use wave::Wave;
 
 //use anyhow::Result;
-use tui::Terminal;
-use tui::backend::CrosstermBackend;
-use tui::layout::{ Layout, Constraint, Direction };
-use crossterm::{
-    ExecutableCommand,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
-    event::{self, Event, KeyEvent, KeyCode}
-};
 use clap::Parser;
-use std::time::Duration;
-use std::path::PathBuf;
+use crossterm::{
+    event::{self, Event, KeyCode, KeyEvent},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
 use std::io;
+use std::path::PathBuf;
+use std::time::Duration;
+use tui::backend::CrosstermBackend;
+use tui::layout::{Constraint, Direction, Layout};
+use tui::Terminal;
 
+fn event_loop_insert(
+    ev: Event,
+    mut state: ScriptState,
+    interpreter: LuaInterpreter,
+) -> Result<((ScriptState, LuaInterpreter), bool)> {
+    match ev {
+        Event::Key(KeyEvent {
+            code: KeyCode::Esc,
+            ..
+        }) => {
+            state.ui.exit_insert_mode();
+        }
+
+        Event::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            ..
+        }) => {
+            state.ui.put_key(c);
+        }
+
+        Event::Key(KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        }) => {
+        }
+
+        Event::Key(KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        }) => {
+            state.ui.take_key();
+        }
+
+        _ => {}
+    }
+
+    Ok(((state, interpreter), false))
+}
+
+fn event_loop_normal(
+    ev: Event,
+    mut state: ScriptState,
+    mut interpreter: LuaInterpreter,
+) -> Result<((ScriptState, LuaInterpreter), bool)> {
+    let mut should_exit = false;
+
+    if state.ui.in_command() {
+        match ev {
+            Event::Key(KeyEvent {
+                code: KeyCode::Char(c),
+                ..
+            }) => {
+                state.ui.put_command(c);
+            }
+
+            Event::Key(KeyEvent {
+                code: KeyCode::Enter,
+                ..
+            }) => {
+                let cmd = state.ui.pop_command().ok_or(Error::NoCommand)?;
+                state = interpreter.run_command(state, cmd)?;
+            }
+
+            Event::Key(KeyEvent {
+                code: KeyCode::Backspace,
+                ..
+            }) => {
+                state.ui.take_command();
+            }
+
+            _ => {}
+        }
+    } else {
+        match ev {
+            // quit
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('q'),
+                ..
+            }) => {
+                should_exit = true;
+            }
+
+            // down
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('j'),
+                ..
+            }) => {
+                state.ui.move_cursor_down();
+            }
+
+            // page down
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('J'),
+                ..
+            }) => {
+                state.ui.move_page_down();
+            }
+
+            // up
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('k'),
+                ..
+            }) => {
+                state.ui.move_cursor_up();
+            }
+
+            // page up
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('K'),
+                ..
+            }) => {
+                state.ui.move_page_up();
+            }
+
+            // left
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('h'),
+                ..
+            }) => {
+                state.ui.move_cursor_left();
+            }
+
+            // page left
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('H'),
+                ..
+            }) => {
+                state.ui.move_page_left();
+            }
+
+            // right
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('l'),
+                ..
+            }) => {
+                state.ui.move_cursor_right();
+            }
+
+            // page right
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('L'),
+                ..
+            }) => {
+                state.ui.move_page_right();
+            }
+
+            // zoom in '+'
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('+'),
+                ..
+            }) => {
+                state.ui.zoom_in();
+            }
+
+            // zoom out '-'
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('-'),
+                ..
+            }) => {
+                state.ui.zoom_out();
+            }
+
+            // Enter command ':'
+            Event::Key(KeyEvent {
+                code: KeyCode::Char(':'),
+                ..
+            }) => {
+                state.ui.start_command();
+            }
+
+            // Enter insert mode 'i'
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('i'),
+                ..
+            }) => {
+                state.ui.start_insert_mode();
+            }
+
+            _ => {}
+        }
+    }
+
+    Ok(((state, interpreter), should_exit))
+}
+
+fn event_loop(
+    state: ScriptState,
+    interpreter: LuaInterpreter,
+) -> Result<((ScriptState, LuaInterpreter), bool)> {
+    if event::poll(Duration::from_millis(200))? {
+        let ev = event::read()?;
+        //let state = interpreter.state_mut();
+
+        if state.ui.in_insert_mode() {
+            event_loop_insert(ev, state, interpreter)
+        } else {
+            event_loop_normal(ev, state, interpreter)
+        }
+    } else {
+        Ok(((state, interpreter), false))
+    }
+}
 
 fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
@@ -47,17 +246,32 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
                 .constraints([
                     Constraint::Min(1),
                     Constraint::Length(1),
-                    Constraint::Length(1)
+                    Constraint::Length(1),
                 ])
                 .split(size);
 
-            //let state = interpreter.state_mut();
-            //let wave = interpreter.wave_mut();
             state.ui.resize(stack[0].width - 48, stack[0].height - 2);
-            state.ui.data_size(state.wv.num_signals(), state.wv.num_cycles());
-            
-            let table = build_table(&state.wv, &state.ui);
-            f.render_stateful_widget(table, size, state.ui.get_mut_table_state());
+            state
+                .ui
+                .data_size(state.wv.num_signals(), state.wv.num_cycles());
+
+            if state.ui.in_insert_mode() {
+                let substack = Layout::default()
+                    .direction(Direction::Vertical)
+                    .margin(0)
+                    .constraints([
+                        Constraint::Ratio(1, 3),
+                        Constraint::Ratio(2, 3),
+                    ])
+                    .split(stack[0]);
+
+                let list = build_insert(&state.wv, &state.ui);
+                f.render_widget(list.0, substack[0]);
+                f.render_widget(list.1, substack[1]);
+            } else {
+                let table = build_table(&state.wv, &state.ui);
+                f.render_stateful_widget(table, size, state.ui.get_mut_table_state());
+            }
 
             let statusline = build_statusline(&state.ui);
             f.render_widget(statusline, stack[1]);
@@ -67,92 +281,12 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
         })?;
 
         // check events
-        if event::poll(Duration::from_millis(200))? {
-            let ev = event::read()?;
-            //let state = interpreter.state_mut();
+        let ((new_state, new_interpreter), should_exit) = event_loop(state, interpreter)?;
+        state = new_state;
+        interpreter = new_interpreter;
 
-            if state.ui.in_command() {
-                match ev {
-                    Event::Key(KeyEvent { code: KeyCode::Char(c), .. }) => {
-                        state.ui.put_command(c);
-                    }
-
-                    Event::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
-                        let cmd = state.ui.pop_command()
-                            .ok_or(Error::NoCommand)?;
-                        state = interpreter.run_command(state, cmd)?;
-                    }
-
-                    Event::Key(KeyEvent { code: KeyCode::Backspace, .. }) => {
-                        state.ui.take_command();
-                    }
-
-                    _ => {}
-                }
-            } else {
-                match ev {
-                    // quit
-                    Event::Key(KeyEvent { code: KeyCode::Char('q'), .. }) => {
-                        break
-                    }
-
-                    // down
-                    Event::Key(KeyEvent { code: KeyCode::Char('j'), .. }) => {
-                        state.ui.move_cursor_down();
-                    }
-
-                    // page down
-                    Event::Key(KeyEvent { code: KeyCode::Char('J'), .. }) => {
-                        state.ui.move_page_down();
-                    }
-
-                    // up
-                    Event::Key(KeyEvent { code: KeyCode::Char('k'), .. }) => {
-                        state.ui.move_cursor_up();
-                    }
-                    
-                    // page up
-                    Event::Key(KeyEvent { code: KeyCode::Char('K'), .. }) => {
-                        state.ui.move_page_up();
-                    }
-                    
-                    // left
-                    Event::Key(KeyEvent { code: KeyCode::Char('h'), .. }) => {
-                        state.ui.move_cursor_left();
-                    }
-
-                    // page left
-                    Event::Key(KeyEvent { code: KeyCode::Char('H'), .. }) => {
-                        state.ui.move_page_left();
-                    }
-
-                    // right
-                    Event::Key(KeyEvent { code: KeyCode::Char('l'), .. }) => {
-                        state.ui.move_cursor_right();
-                    }
-
-                    // page right
-                    Event::Key(KeyEvent { code: KeyCode::Char('L'), .. }) => {
-                        state.ui.move_page_right();
-                    }
-
-                    // zoom in '+'
-                    Event::Key(KeyEvent { code: KeyCode::Char('+'), .. }) => {
-                        state.ui.zoom_in();
-                    }
-
-                    // zoom out '-'
-                    Event::Key(KeyEvent { code: KeyCode::Char('-'), .. }) => {
-                        state.ui.zoom_out();
-                    }
-
-                    Event::Key(KeyEvent { code: KeyCode::Char(':'), .. }) => {
-                        state.ui.start_command();
-                    }
-
-                    _ => {}
-                }
-            }
+        if should_exit {
+            break;
         }
     }
 
@@ -161,8 +295,10 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
 
 fn setup(opts: Opts) -> Result<(ScriptState, LuaInterpreter)> {
     if opts.input.ends_with(".vcd") {
-        let clock_period = opts.clock_period
-            .ok_or(Error::MissingArgument("--clock_period".into(), "Required to load a vcd file".into()))?;
+        let clock_period = opts.clock_period.ok_or(Error::MissingArgument(
+            "--clock_period".into(),
+            "Required to load a vcd file".into(),
+        ))?;
         let opt_timeunits = opts.timeunits.trim().to_lowercase();
         let cycle_time = SimTime::new(clock_period, SimTimeUnit::from_string(opt_timeunits)?);
         let loader = Box::new(VcdLoader::new(PathBuf::from(opts.input), cycle_time)?);
@@ -170,7 +306,7 @@ fn setup(opts: Opts) -> Result<(ScriptState, LuaInterpreter)> {
 
         //let mut interpreter = LuaInterpreter::new(state, wave);
         let state = ScriptState {
-            ui: State::new(), 
+            ui: State::new(),
             wv: wave,
         };
         let interpreter = LuaInterpreter::new()?;
@@ -181,7 +317,7 @@ fn setup(opts: Opts) -> Result<(ScriptState, LuaInterpreter)> {
         let wave = Wave::load(loader)?;
 
         let state = ScriptState {
-            ui: State::new(), 
+            ui: State::new(),
             wv: wave,
         };
         let mut interpreter = LuaInterpreter::new()?;
@@ -192,7 +328,6 @@ fn setup(opts: Opts) -> Result<(ScriptState, LuaInterpreter)> {
         Err(Error::UnknownFileFormat(opts.input.clone()))
     }
 }
-
 
 /// Display a wave file in the console.
 #[derive(Parser)]
@@ -212,7 +347,7 @@ struct Opts {
 fn main() -> Result<()> {
     let opts: Opts = Opts::parse();
     let mut stdout = io::stdout();
-    
+
     stdout.execute(EnterAlternateScreen)?;
     crossterm::terminal::enable_raw_mode()?;
 
@@ -229,7 +364,7 @@ fn main() -> Result<()> {
             let mut stdout = io::stdout();
             stdout.execute(LeaveAlternateScreen)?;
 
-            println!("Error: {}", err); 
+            println!("Error: {}", err);
             Err(err)
         }
     }
