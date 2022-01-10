@@ -57,7 +57,6 @@ fn event_loop_insert(
                     .push(insertion.clone());
                 state.wv.reconfigure()?;
                 state.wv = state.wv.reload()?;
-                state.ui.exit_insert_mode()?;
             }
         }
 
