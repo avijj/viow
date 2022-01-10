@@ -7,7 +7,7 @@ mod scripts;
 mod viewer;
 mod wave;
 
-use data::{SimTime, SimTimeUnit, QuerySource};
+use data::{SimTime, SimTimeUnit};
 use error::*;
 use load::{empty::EmptyLoader, vcd::VcdLoader};
 use scripts::{lua::LuaInterpreter, RunCommand, ScriptState};
@@ -38,7 +38,7 @@ fn event_loop_insert(
             code: KeyCode::Esc,
             ..
         }) => {
-            state.ui.exit_insert_mode();
+            state.ui.exit_insert_mode()?;
         }
 
         Event::Key(KeyEvent {
@@ -52,6 +52,20 @@ fn event_loop_insert(
             code: KeyCode::Enter,
             ..
         }) => {
+            if let Some(insertion) = state.ui.get_suggestion() {
+                state.wv.get_config_mut().name_list
+                    .push(insertion.clone());
+                state.wv.reconfigure()?;
+                state.wv = state.wv.reload()?;
+                state.ui.exit_insert_mode()?;
+            }
+        }
+
+        Event::Key(KeyEvent {
+            code: KeyCode::Tab,
+            ..
+        }) => {
+            state.ui.next_suggestion();
         }
 
         Event::Key(KeyEvent {
@@ -277,7 +291,7 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
                 let (list, suggestions, prompt) = build_insert(&state.wv, &state.ui);
                 f.render_widget(list, substack[0]);
                 f.render_widget(prompt, substack[1]);
-                f.render_widget(suggestions, substack[2]);
+                f.render_stateful_widget(suggestions, substack[2], state.ui.suggestion_state().unwrap());
             } else {
                 let table = build_table(&state.wv, &state.ui);
                 f.render_stateful_widget(table, size, state.ui.get_mut_table_state());

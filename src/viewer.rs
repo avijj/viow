@@ -1,8 +1,8 @@
+use crate::error::*;
 use crate::formatting::build_waveform;
 use crate::wave::Wave;
 
-use tui::widgets::TableState;
-use tui::widgets::{ List, ListItem, Table, Row, Cell, Paragraph };
+use tui::widgets::*;
 use tui::layout::Constraint;
 use tui::style::{Style, Color, Modifier};
 use tui::text::{Text, Spans, Span};
@@ -10,6 +10,8 @@ use tui::text::{Text, Spans, Span};
 pub struct InsertState {
     prompt: String,
     signals: Vec<String>,
+    suggested: Vec<String>,
+    suggestion_state: ListState,
 }
 
 pub enum Mode {
@@ -282,7 +284,9 @@ impl State {
     pub fn start_insert_mode(&mut self, signals: Vec<String>) {
         let m = InsertState {
             prompt: "".into(),
-            signals
+            signals,
+            suggested: vec![],
+            suggestion_state: ListState::default(),
         };
 
         self.mode = Mode::Insert(m);
@@ -295,14 +299,28 @@ impl State {
         }
     }
 
-    pub fn exit_insert_mode(&mut self) {
+    pub fn exit_insert_mode(&mut self) -> Result<String> {
+        let rv;
+
+        match self.mode {
+            Mode::Insert(ref istate) => {
+                rv = istate.prompt.clone();
+            }
+
+            _ => {
+                return Err(Error::WrongMode("Expect to be in insert mode, when exiting insert mode".into()));
+            }
+        }
+        
         self.mode = Mode::Normal;
+        Ok(rv)
     }
 
     pub fn put_key(&mut self, c: char) {
         match self.mode {
             Mode::Insert(ref mut istate) => {
                 istate.prompt.push(c);
+                Self::update_suggestions(istate);
             }
 
             _ => { }
@@ -312,7 +330,72 @@ impl State {
     pub fn take_key(&mut self) -> Option<char> {
         match self.mode {
             Mode::Insert(ref mut istate) => {
-                istate.prompt.pop()
+                let rv = istate.prompt.pop();
+                Self::update_suggestions(istate);
+                rv
+            }
+
+            _ => {
+                None
+            }
+        }
+    }
+
+    fn update_suggestions(istate: &mut InsertState) -> usize {
+        let suggested = istate.signals.iter() 
+            .filter_map(|x| {
+                if x.contains(&istate.prompt) {
+                    Some(x.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        istate.suggested = suggested;
+        istate.suggested.len()
+    }
+
+    pub fn next_suggestion(&mut self) {
+        match self.mode {
+            Mode::Insert(ref mut istate) => {
+                if let Some(selected) = istate.suggestion_state.selected() {
+                    if selected + 1 < istate.suggested.len() {
+                        istate.suggestion_state.select(Some(selected + 1));
+                    } else {
+                        istate.suggestion_state.select(None);
+                    }
+                } else {
+                    if !istate.suggested.is_empty() {
+                        istate.suggestion_state.select(Some(0));
+                    }
+                }
+            }
+
+            _ => {}
+        }
+    }
+
+    pub fn suggestion_state(&mut self) -> Option<&mut ListState> {
+        match self.mode {
+            Mode::Insert(ref mut istate) => {
+                Some(&mut istate.suggestion_state)
+            }
+
+            _ => {
+                None
+            }
+        }
+    }
+
+    pub fn get_suggestion(&self) -> Option<&String> {
+        match self.mode {
+            Mode::Insert(ref istate) => {
+                if let Some(n) = istate.suggestion_state.selected() {
+                    istate.suggested.get(n)
+                } else {
+                    None
+                }
             }
 
             _ => {
@@ -411,7 +494,7 @@ pub fn build_commandline(state: &State) -> Paragraph {
     Paragraph::new(line_txt)
 }
 
-pub fn build_insert<'a>(wave: &'a Wave, state: &'a State) -> (List<'a>, List<'a>, Paragraph<'a>) {
+pub fn build_insert<'a, 'b>(wave: &'a Wave, state: &'a State) -> (List<'a>, List<'b>, Paragraph<'a>) {
     let name_list = &wave.get_config().name_list;
     let items: Vec<_> = name_list.iter()
         .map(|name| ListItem::new(name.as_ref()))
@@ -422,8 +505,10 @@ pub fn build_insert<'a>(wave: &'a Wave, state: &'a State) -> (List<'a>, List<'a>
 
     if let Mode::Insert(ref insert_state) = state.mode {
         prompt_line = Paragraph::new(Text::raw(&insert_state.prompt));
-        //suggestion_items = autocomplete(&insert_state.prompt, &insert_state.signals)
-        suggestion_items = insert_state.signals.iter()
+        suggestion_items = insert_state.suggested.iter()
+            .map(|name| ListItem::new(name.clone()))
+            .collect();
+        /*suggestion_items = insert_state.signals.iter()
             .filter_map(|x| {
                 if x.contains(&insert_state.prompt) {
                     Some(x.as_str())
@@ -432,23 +517,17 @@ pub fn build_insert<'a>(wave: &'a Wave, state: &'a State) -> (List<'a>, List<'a>
                 }
             })
             .map(|name| ListItem::new(name.clone()))
-            .collect();
+            .collect();*/
     } else {
         prompt_line = Paragraph::new(Text::raw(""));
         suggestion_items = vec![];
     };
 
-    (List::new(items), List::new(suggestion_items), prompt_line)
+    let suggestion_list = List::new(suggestion_items)
+        .block(Block::default().borders(Borders::ALL))
+        .highlight_symbol(">>");
+
+    (List::new(items), suggestion_list, prompt_line)
 }
 
 
-//fn autocomplete<'a>(prompt: &'a str, options: &'a Vec<String>) -> impl Iterator<Item = &'a str> {
-    //options.iter()
-        //.filter_map(|x| {
-            //if x.contains(prompt) {
-                //Some(x.as_str())
-            //} else {
-                //None
-            //}
-        //})
-//}

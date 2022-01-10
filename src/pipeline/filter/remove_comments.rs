@@ -1,4 +1,3 @@
-use regex::Regex;
 use rug;
 
 use crate::error::*;

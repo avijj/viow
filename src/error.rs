@@ -35,6 +35,9 @@ pub enum Error {
 
     #[error("No command specified")]
     NoCommand,
+
+    #[error("Unexpected mode: {0:}")]
+    WrongMode(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
