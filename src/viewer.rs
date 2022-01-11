@@ -3,12 +3,17 @@ use crate::formatting::build_waveform;
 use crate::wave::Wave;
 
 use tui::widgets::*;
-use tui::layout::Constraint;
+use tui::terminal::Frame;
+use tui::backend::Backend;
+use tui::layout::{Direction, Layout, Rect, Constraint};
 use tui::style::{Style, Color, Modifier};
 use tui::text::{Text, Spans, Span};
 
 pub struct InsertState {
     prompt: String,
+    list: Vec<String>,
+    at: usize,
+    list_state: ListState,
     signals: Vec<String>,
     suggested: Vec<String>,
     suggestion_state: ListState,
@@ -281,10 +286,17 @@ impl State {
         //Ok(())
     //}
     
-    pub fn start_insert_mode(&mut self, signals: Vec<String>) {
+    pub fn start_insert_mode(&mut self, signals: Vec<String>, mut list: Vec<String>, insert_at: usize) {
+        list.insert(insert_at, "#".into());
+        let mut list_state = ListState::default();
+        list_state.select(Some(insert_at));
+
         let m = InsertState {
             prompt: "".into(),
+            list,
+            list_state,
             signals,
+            at: insert_at,
             suggested: vec![],
             suggestion_state: ListState::default(),
         };
@@ -341,6 +353,22 @@ impl State {
         }
     }
 
+    pub fn enter_key(&mut self) {
+        match self.mode {
+            Mode::Insert(ref mut istate) => {
+                if istate.at + 1 >= istate.list.len() {
+                    istate.list.push("#".into());
+                } else {
+                    istate.list.insert(istate.at + 1, "#".into());
+                }
+                istate.at += 1;
+                istate.list_state.select(Some(istate.at));
+            }
+
+            _ => {}
+        }
+    }
+
     fn update_suggestions(istate: &mut InsertState) -> usize {
         let suggested = istate.signals.iter() 
             .filter_map(|x| {
@@ -352,6 +380,12 @@ impl State {
             })
             .collect();
 
+        if let Some(selected) = istate.suggestion_state.selected() {
+            if selected >= istate.suggested.len() {
+                istate.suggestion_state.select(None);
+            }
+        }
+
         istate.suggested = suggested;
         istate.suggested.len()
     }
@@ -362,29 +396,22 @@ impl State {
                 if let Some(selected) = istate.suggestion_state.selected() {
                     if selected + 1 < istate.suggested.len() {
                         istate.suggestion_state.select(Some(selected + 1));
+                        istate.list[istate.at] = istate.suggested[selected + 1].clone();
                     } else {
                         istate.suggestion_state.select(None);
+                        istate.list[istate.at] = "#".into();
                     }
                 } else {
                     if !istate.suggested.is_empty() {
                         istate.suggestion_state.select(Some(0));
+                        istate.list[istate.at] = istate.suggested[0].clone();
+                    } else {
+                        istate.list[istate.at] = "#".into();
                     }
                 }
             }
 
             _ => {}
-        }
-    }
-
-    pub fn suggestion_state(&mut self) -> Option<&mut ListState> {
-        match self.mode {
-            Mode::Insert(ref mut istate) => {
-                Some(&mut istate.suggestion_state)
-            }
-
-            _ => {
-                None
-            }
         }
     }
 
@@ -396,6 +423,18 @@ impl State {
                 } else {
                     None
                 }
+            }
+
+            _ => {
+                None
+            }
+        }
+    }
+
+    pub fn get_insert_list(&self) -> Option<&Vec<String>> {
+        match self.mode {
+            Mode::Insert(ref istate) => {
+                Some(&istate.list)
             }
 
             _ => {
@@ -494,40 +533,83 @@ pub fn build_commandline(state: &State) -> Paragraph {
     Paragraph::new(line_txt)
 }
 
-pub fn build_insert<'a, 'b>(wave: &'a Wave, state: &'a State) -> (List<'a>, List<'b>, Paragraph<'a>) {
-    let name_list = &wave.get_config().name_list;
-    let items: Vec<_> = name_list.iter()
-        .map(|name| ListItem::new(name.as_ref()))
-        .collect();
+//pub fn build_insert<'a, 'b>(state: &'a State) -> (List<'a>, List<'b>, Paragraph<'a>) {
+    //let prompt_line;
+    //let suggestion_items: Vec<_>;
+    //let items: Vec<_>;
 
-    let prompt_line;
-    let suggestion_items: Vec<_>;
+    //if let Mode::Insert(ref insert_state) = state.mode {
+        ////let name_list = &wave.get_config().name_list;
+        //let name_list = &insert_state.signals;
+        //items = name_list.iter()
+            //.map(|name| ListItem::new(name.as_ref()))
+            //.collect();
 
-    if let Mode::Insert(ref insert_state) = state.mode {
-        prompt_line = Paragraph::new(Text::raw(&insert_state.prompt));
-        suggestion_items = insert_state.suggested.iter()
+        //prompt_line = Paragraph::new(Text::raw(&insert_state.prompt));
+        //suggestion_items = insert_state.suggested.iter()
+            //.map(|name| ListItem::new(name.clone()))
+            //.collect();
+    //} else {
+        //items = vec![];
+        //prompt_line = Paragraph::new(Text::raw(""));
+        //suggestion_items = vec![];
+    //};
+
+    //let suggestion_list = List::new(suggestion_items)
+        //.block(Block::default().borders(Borders::ALL))
+        //.highlight_symbol(">>");
+
+    //(List::new(items), suggestion_list, prompt_line)
+//}
+
+
+pub fn render_insert<T: Backend>(frame: &mut Frame<T>, rect: &Rect, state: &mut State) {
+    if let Mode::Insert(ref mut insert_state) = state.mode {
+        //
+        // Construct widgets
+        //
+
+        //let name_list = &wave.get_config().name_list;
+        let name_list = &insert_state.list;
+        let items: Vec<_> = name_list.iter()
+            .map(|name| ListItem::new(name.as_ref()))
+            .collect();
+
+        let prompt_line = Paragraph::new(Text::raw(&insert_state.prompt));
+        let suggestion_items: Vec<_> = insert_state.suggested.iter()
             .map(|name| ListItem::new(name.clone()))
             .collect();
-        /*suggestion_items = insert_state.signals.iter()
-            .filter_map(|x| {
-                if x.contains(&insert_state.prompt) {
-                    Some(x.as_str())
-                } else {
-                    None
-                }
-            })
-            .map(|name| ListItem::new(name.clone()))
-            .collect();*/
-    } else {
-        prompt_line = Paragraph::new(Text::raw(""));
-        suggestion_items = vec![];
-    };
 
-    let suggestion_list = List::new(suggestion_items)
-        .block(Block::default().borders(Borders::ALL))
-        .highlight_symbol(">>");
+        let suggestion_list = List::new(suggestion_items)
+            .block(Block::default().borders(Borders::ALL))
+            .highlight_symbol(">>");
 
-    (List::new(items), suggestion_list, prompt_line)
+        let list = List::new(items)
+            .highlight_symbol(">");
+
+        //
+        // Drawing
+        //
+
+        let vsplit = Layout::default()
+            .direction(Direction::Horizontal)
+            .margin(0)
+            .constraints([
+                Constraint::Ratio(1,2),
+                Constraint::Ratio(1,2)
+            ])
+            .split(*rect);
+        let right = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(0)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Min(1),
+            ])
+            .split(vsplit[1]);
+
+        frame.render_stateful_widget(list, vsplit[0], &mut insert_state.list_state);
+        frame.render_widget(prompt_line, right[0]);
+        frame.render_stateful_widget(suggestion_list, right[1], &mut insert_state.suggestion_state);
+    }
 }
-
-

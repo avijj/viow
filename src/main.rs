@@ -38,6 +38,10 @@ fn event_loop_insert(
             code: KeyCode::Esc,
             ..
         }) => {
+            let new_name_list = state.ui.get_insert_list().unwrap().clone();
+            state.wv.get_config_mut().name_list = new_name_list;
+            state.wv.reconfigure()?;
+            state.wv = state.wv.reload()?;
             state.ui.exit_insert_mode()?;
         }
 
@@ -52,12 +56,13 @@ fn event_loop_insert(
             code: KeyCode::Enter,
             ..
         }) => {
-            if let Some(insertion) = state.ui.get_suggestion() {
-                state.wv.get_config_mut().name_list
-                    .push(insertion.clone());
-                state.wv.reconfigure()?;
-                state.wv = state.wv.reload()?;
-            }
+            state.ui.enter_key();
+            //if let Some(insertion) = state.ui.get_suggestion() {
+                //state.wv.get_config_mut().name_list
+                    //.push(insertion.clone());
+                //state.wv.reconfigure()?;
+                //state.wv = state.wv.reload()?;
+            //}
         }
 
         Event::Key(KeyEvent {
@@ -224,7 +229,8 @@ fn event_loop_normal(
                 state.wv.get_config_mut().enable_filter_list = true;
                 state.wv.reconfigure()?;
                 state.wv = state.wv.reload()?;
-                state.ui.start_insert_mode(unfiltered);
+                let insert_at = state.ui.get_cur_wave_row();
+                state.ui.start_insert_mode(unfiltered, state.wv.get_names().clone(), insert_at);
             }
 
             _ => {}
@@ -271,26 +277,37 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
                 ])
                 .split(size);
 
-            state.ui.resize(stack[0].width - 48, stack[0].height - 2);
+            state.ui.resize(stack[0].width.saturating_sub(48), stack[0].height.saturating_sub(2));
             state
                 .ui
                 .data_size(state.wv.num_signals(), state.wv.num_cycles());
 
             if state.ui.in_insert_mode() {
-                let substack = Layout::default()
+                render_insert(f, &stack[0], &mut state.ui);
+                /*let vsplit = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .margin(0)
+                    .constraints([
+                        Constraint::Ratio(1,2),
+                        Constraint::Ratio(1,2)
+                    ])
+                    .split(stack[0]);
+                let right = Layout::default()
                     .direction(Direction::Vertical)
                     .margin(0)
                     .constraints([
-                        Constraint::Ratio(1, 3),
                         Constraint::Length(1),
-                        Constraint::Ratio(2, 3),
+                        Constraint::Min(1),
                     ])
-                    .split(stack[0]);
+                    .split(vsplit[1]);
 
-                let (list, suggestions, prompt) = build_insert(&state.wv, &state.ui);
-                f.render_widget(list, substack[0]);
-                f.render_widget(prompt, substack[1]);
-                f.render_stateful_widget(suggestions, substack[2], state.ui.suggestion_state().unwrap());
+                let (suggestion_state, signals_state) = state.ui.insert_widget_states().unwrap();
+                let (list, suggestions, prompt) = build_insert(&state.ui);
+                //let (list, suggestions, prompt) = build_insert(&state.ui);
+                f.render_widget(list, vsplit[0]);
+                f.render_widget(prompt, right[0]);
+
+                f.render_stateful_widget(suggestions, right[1], suggestion_state);*/
             } else {
                 let table = build_table(&state.wv, &state.ui);
                 f.render_stateful_widget(table, size, state.ui.get_mut_table_state());
