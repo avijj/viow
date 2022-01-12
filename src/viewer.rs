@@ -533,36 +533,6 @@ pub fn build_commandline(state: &State) -> Paragraph {
     Paragraph::new(line_txt)
 }
 
-//pub fn build_insert<'a, 'b>(state: &'a State) -> (List<'a>, List<'b>, Paragraph<'a>) {
-    //let prompt_line;
-    //let suggestion_items: Vec<_>;
-    //let items: Vec<_>;
-
-    //if let Mode::Insert(ref insert_state) = state.mode {
-        ////let name_list = &wave.get_config().name_list;
-        //let name_list = &insert_state.signals;
-        //items = name_list.iter()
-            //.map(|name| ListItem::new(name.as_ref()))
-            //.collect();
-
-        //prompt_line = Paragraph::new(Text::raw(&insert_state.prompt));
-        //suggestion_items = insert_state.suggested.iter()
-            //.map(|name| ListItem::new(name.clone()))
-            //.collect();
-    //} else {
-        //items = vec![];
-        //prompt_line = Paragraph::new(Text::raw(""));
-        //suggestion_items = vec![];
-    //};
-
-    //let suggestion_list = List::new(suggestion_items)
-        //.block(Block::default().borders(Borders::ALL))
-        //.highlight_symbol(">>");
-
-    //(List::new(items), suggestion_list, prompt_line)
-//}
-
-
 pub fn render_insert<T: Backend>(frame: &mut Frame<T>, rect: &Rect, state: &mut State) {
     if let Mode::Insert(ref mut insert_state) = state.mode {
         //
