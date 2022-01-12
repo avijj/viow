@@ -19,5 +19,5 @@ vcd = { git = "https://github.com/kevinmehall/rust-vcd" }
 thiserror = "1.0"
 anyhow = "1.0"
 clap = { version = "3.0", features = [ "derive" ] }
-mlua = { version = "0.6", features = [ "lua54" ] }
+mlua = { version = "0.7", features = [ "lua54" ] }
 regex = "1"

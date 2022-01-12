@@ -1,13 +1,11 @@
-use crate::error::*;
 
-use tui::style::*;
-use std::path::{Path,PathBuf};
+use std::path::PathBuf;
 use std::env::var;
 
 
 #[derive(Debug)]
 pub struct Config {
-    config_dir: Option<PathBuf>,
+    _config_dir: Option<PathBuf>,
     script_dir: Option<PathBuf>,
 }
 
@@ -17,7 +15,7 @@ impl Config {
         let script_dir = Self::find_script_dir(&config_dir);
 
         Self {
-            config_dir,
+            _config_dir: config_dir,
             script_dir,
         }
     }
