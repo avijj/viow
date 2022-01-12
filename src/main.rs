@@ -1,3 +1,4 @@
+mod config;
 mod data;
 mod error;
 mod formatting;
@@ -7,6 +8,7 @@ mod scripts;
 mod viewer;
 mod wave;
 
+use config::Config;
 use data::{SimTime, SimTimeUnit};
 use error::*;
 use load::{empty::EmptyLoader, vcd::VcdLoader};
@@ -22,6 +24,7 @@ use crossterm::{
     ExecutableCommand,
 };
 use std::io;
+use std::rc::Rc;
 use std::path::PathBuf;
 use std::time::Duration;
 use tui::backend::CrosstermBackend;
@@ -258,12 +261,12 @@ fn event_loop(
     }
 }
 
-fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
+fn render_loop(stdout: std::io::Stdout, opts: Opts, config: Rc<Config>) -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
-    let (mut state, mut interpreter) = setup(opts)?;
+    let (mut state, mut interpreter) = setup(opts, config)?;
     loop {
         terminal.draw(|f| {
             let size = f.size();
@@ -333,7 +336,7 @@ fn render_loop(stdout: std::io::Stdout, opts: Opts) -> Result<()> {
     Ok(())
 }
 
-fn setup(opts: Opts) -> Result<(ScriptState, LuaInterpreter)> {
+fn setup(opts: Opts, config: Rc<Config>) -> Result<(ScriptState, LuaInterpreter)> {
     if opts.input.ends_with(".vcd") {
         let clock_period = opts.clock_period.ok_or(Error::MissingArgument(
             "--clock_period".into(),
@@ -349,7 +352,7 @@ fn setup(opts: Opts) -> Result<(ScriptState, LuaInterpreter)> {
             ui: State::new(),
             wv: wave,
         };
-        let interpreter = LuaInterpreter::new()?;
+        let interpreter = LuaInterpreter::new(&config)?;
 
         Ok((state, interpreter))
     } else if opts.input.ends_with(".lua") {
@@ -360,7 +363,7 @@ fn setup(opts: Opts) -> Result<(ScriptState, LuaInterpreter)> {
             ui: State::new(),
             wv: wave,
         };
-        let mut interpreter = LuaInterpreter::new()?;
+        let mut interpreter = LuaInterpreter::new(&config)?;
         let state = interpreter.run_file(state, opts.input)?;
 
         Ok((state, interpreter))
@@ -386,12 +389,13 @@ struct Opts {
 
 fn main() -> Result<()> {
     let opts: Opts = Opts::parse();
+    let config = Rc::new(Config::load());
     let mut stdout = io::stdout();
 
     stdout.execute(EnterAlternateScreen)?;
     crossterm::terminal::enable_raw_mode()?;
 
-    match render_loop(stdout, opts) {
+    match render_loop(stdout, opts, config) {
         Ok(_) => {
             crossterm::terminal::disable_raw_mode()?;
             let mut stdout = io::stdout();

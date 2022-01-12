@@ -1,6 +1,7 @@
 mod api;
 
 use super::*;
+use crate::config::Config;
 use crate::viewer;
 use crate::data::*;
 use crate::wave::*;
@@ -25,8 +26,10 @@ pub struct LuaInterpreter {
 }
 
 impl LuaInterpreter {
-    pub fn new() -> Result<Self> {
+    pub fn new(config: impl AsRef<Config>) -> Result<Self> {
         let lua = Lua::new();
+
+        Self::configure_lua_path(&lua, config)?;
 
         add_global_function!(lua, load_vcd);
         add_global_function!(lua, filter_signals);
@@ -38,6 +41,21 @@ impl LuaInterpreter {
         Ok(Self {
             lua
         })
+    }
+
+    fn configure_lua_path(lua: &Lua, config: impl AsRef<Config>) -> Result<()> {
+        let lua_path = config.as_ref().get_script_dir()
+            .and_then(|script_path| script_path.to_str())
+            .map(|dirname| format!("?.lua;{0:}/?.lua", dirname));
+
+        if let Some(lua_path) = lua_path {
+            let package: mlua::Table = lua.globals().get("package")?;
+            let path: String = package.get("path")?;
+            let new_path = format!("{};{}", path, lua_path);
+            package.set("path", new_path)?;
+        }
+
+        Ok(())
     }
 
     pub fn run_file(&mut self, state: ScriptState, filename: impl AsRef<str>) -> Result<ScriptState> {
