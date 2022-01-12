@@ -415,22 +415,6 @@ impl State {
         }
     }
 
-    pub fn get_suggestion(&self) -> Option<&String> {
-        match self.mode {
-            Mode::Insert(ref istate) => {
-                if let Some(n) = istate.suggestion_state.selected() {
-                    istate.suggested.get(n)
-                } else {
-                    None
-                }
-            }
-
-            _ => {
-                None
-            }
-        }
-    }
-
     pub fn get_insert_list(&self) -> Option<&Vec<String>> {
         match self.mode {
             Mode::Insert(ref istate) => {

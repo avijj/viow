@@ -96,10 +96,6 @@ impl Wave {
         Ok((new_self, filter))
     }
 
-    pub fn get_config(&self) -> &PipelineConfig {
-        &self.config
-    }
-
     pub fn get_config_mut(&mut self) -> &mut PipelineConfig {
         &mut self.config
     }

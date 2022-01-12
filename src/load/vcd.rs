@@ -11,7 +11,6 @@ use ndarray::prelude::*;
 
 struct SignalInfo {
     index: usize,
-    var_type: vcd::VarType,
 }
 
 type SignalMap = HashMap<vcd::IdCode, SignalInfo>;
@@ -63,7 +62,6 @@ impl VcdLoader {
 
                             let info = SignalInfo {
                                 index: rv.len()-1,
-                                var_type: var.var_type,
                             };
 
                             sigmap.insert(var.code, info);
