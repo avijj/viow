@@ -1,0 +1,862 @@
+$date
+  Wed Jan  5 22:59:00 2022
+$end
+$version
+  GHDL v0
+$end
+$timescale
+  1 fs
+$end
+$scope module standard $end
+$upscope $end
+$scope module textio $end
+$upscope $end
+$scope module std_logic_1164 $end
+$upscope $end
+$scope module types_pkg $end
+$upscope $end
+$scope module vbus_if $end
+$upscope $end
+$scope module numeric_std $end
+$upscope $end
+$scope module decode_pkg $end
+$upscope $end
+$scope module math_real $end
+$upscope $end
+$scope module tb_core $end
+$var reg 1 ! clk $end
+$var reg 1 " reset $end
+$comment c_m_rd is not handled $end
+$comment c_m_wr is not handled $end
+$comment m_c_rd is not handled $end
+$comment m_c_wr is not handled $end
+$scope module uut $end
+$var reg 1 # clk $end
+$var reg 1 $ reset $end
+$comment c_m_rd is not handled $end
+$comment c_m_wr is not handled $end
+$comment m_c_rd is not handled $end
+$comment m_c_wr is not handled $end
+$comment if_ab_rd is not handled $end
+$comment ab_if_rd is not handled $end
+$scope module ifu $end
+$var reg 1 % clk $end
+$var reg 1 & reset $end
+$comment if_ab_rd is not handled $end
+$comment ab_if_rd is not handled $end
+$comment scob_q is not handled $end
+$comment state_q is not handled $end
+$comment state_s is not handled $end
+$var reg 2 ' i0_pass_q[0:1] $end
+$var reg 2 ( i0_pass_s[0:1] $end
+$var reg 2 ) i1_pass_q[0:1] $end
+$var reg 2 * i1_pass_s[0:1] $end
+$var reg 2 + i2_pass_q[0:1] $end
+$var reg 2 , i2_pass_s[0:1] $end
+$var reg 2 - i3_pass_q[0:1] $end
+$var reg 2 . i3_pass_s[0:1] $end
+$comment i1_insn_q is not handled $end
+$comment i1_insn_s is not handled $end
+$var reg 1 / i1_next_dword $end
+$var reg 1 0 i0_next_insn $end
+$var reg 1 1 i3_new_itext $end
+$var reg 1 2 i3_inv_itext $end
+$var reg 1 3 i1_wr_scob $end
+$upscope $end
+$scope module abu $end
+$var reg 1 4 clk $end
+$var reg 1 5 reset $end
+$comment if_ab_rd is not handled $end
+$comment ab_if_rd is not handled $end
+$comment ab_m_rd is not handled $end
+$comment m_ab_rd is not handled $end
+$comment ab_if_rd_q is not handled $end
+$upscope $end
+$upscope $end
+$scope module mem $end
+$var reg 1 6 clk $end
+$comment cmd_rd is not handled $end
+$comment cmd_wr is not handled $end
+$comment resp_rd is not handled $end
+$comment resp_wr is not handled $end
+$var reg 1 7 act_rd_q $end
+$comment mem is not handled $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+#0
+0!
+1"
+0#
+1$
+0%
+1&
+bUU '
+bUU (
+bUU )
+bUU *
+bUU +
+bUU ,
+bUU -
+bUU .
+U/
+U0
+U1
+U2
+U3
+04
+15
+06
+U7
+#100000
+1!
+1#
+1%
+b00 '
+b10 (
+b00 )
+b00 *
+b00 +
+b00 ,
+b00 -
+b00 .
+0/
+00
+01
+03
+14
+16
+#200000
+0!
+0#
+0%
+04
+06
+#300000
+1!
+1#
+1%
+14
+16
+07
+#400000
+0!
+0#
+0%
+04
+06
+#500000
+1!
+1#
+1%
+14
+16
+#600000
+0!
+0#
+0%
+04
+06
+#700000
+1!
+1#
+1%
+14
+16
+#800000
+0!
+0#
+0%
+04
+06
+#900000
+1!
+1#
+1%
+14
+16
+#1000000
+0!
+0"
+0#
+0$
+0%
+0&
+04
+05
+06
+#1100000
+1!
+1#
+1%
+b10 '
+b00 (
+b10 *
+14
+16
+#1200000
+0!
+0#
+0%
+04
+06
+#1300000
+1!
+1#
+1%
+b00 '
+b10 )
+b00 *
+b10 ,
+14
+16
+17
+#1400000
+0!
+0#
+0%
+04
+06
+#1500000
+1!
+1#
+1%
+b00 )
+b10 +
+b00 ,
+b10 .
+14
+16
+07
+#1600000
+0!
+0#
+0%
+04
+06
+#1700000
+1!
+1#
+1%
+b00 +
+b10 -
+b00 .
+11
+14
+16
+#1800000
+0!
+0#
+0%
+04
+06
+#1900000
+1!
+1#
+1%
+b01 (
+b00 -
+01
+14
+16
+#2000000
+0!
+0#
+0%
+04
+06
+#2100000
+1!
+1#
+1%
+b01 '
+b01 *
+10
+14
+16
+#2200000
+0!
+0#
+0%
+04
+06
+#2300000
+1!
+1#
+1%
+b01 )
+b01 ,
+13
+14
+16
+#2400000
+0!
+0#
+0%
+04
+06
+#2500000
+1!
+1#
+1%
+b01 +
+b01 .
+14
+16
+#2600000
+0!
+0#
+0%
+04
+06
+#2700000
+1!
+1#
+1%
+b01 -
+14
+16
+#2800000
+0!
+0#
+0%
+04
+06
+#2900000
+1!
+1#
+1%
+14
+16
+#3000000
+0!
+0#
+0%
+04
+06
+#3100000
+1!
+1#
+1%
+03
+14
+16
+#3200000
+0!
+0#
+0%
+04
+06
+#3300000
+1!
+1#
+1%
+14
+16
+#3400000
+0!
+0#
+0%
+04
+06
+#3500000
+1!
+1#
+1%
+b00 (
+1/
+00
+14
+16
+#3600000
+0!
+0#
+0%
+04
+06
+#3700000
+1!
+1#
+1%
+b00 '
+b10 (
+b00 *
+0/
+14
+16
+#3800000
+0!
+0#
+0%
+04
+06
+#3900000
+1!
+1#
+1%
+b10 '
+b00 (
+b00 )
+b10 *
+b00 ,
+14
+16
+#4000000
+0!
+0#
+0%
+04
+06
+#4100000
+1!
+1#
+1%
+b00 '
+b10 )
+b00 *
+b00 +
+b10 ,
+b00 .
+14
+16
+17
+#4200000
+0!
+0#
+0%
+04
+06
+#4300000
+1!
+1#
+1%
+b00 )
+b10 +
+b00 ,
+b00 -
+b10 .
+14
+16
+07
+#4400000
+0!
+0#
+0%
+04
+06
+#4500000
+1!
+1#
+1%
+b00 +
+b10 -
+b00 .
+11
+14
+16
+#4600000
+0!
+0#
+0%
+04
+06
+#4700000
+1!
+1#
+1%
+b01 (
+b00 -
+01
+14
+16
+#4800000
+0!
+0#
+0%
+04
+06
+#4900000
+1!
+1#
+1%
+b01 '
+b01 *
+10
+14
+16
+#5000000
+0!
+0#
+0%
+04
+06
+#5100000
+1!
+1#
+1%
+b01 )
+b01 ,
+14
+16
+#5200000
+0!
+0#
+0%
+04
+06
+#5300000
+1!
+1#
+1%
+b01 +
+b01 .
+14
+16
+#5400000
+0!
+0#
+0%
+04
+06
+#5500000
+1!
+1#
+1%
+b01 -
+14
+16
+#5600000
+0!
+0#
+0%
+04
+06
+#5700000
+1!
+1#
+1%
+14
+16
+#5800000
+0!
+0#
+0%
+04
+06
+#5900000
+1!
+1#
+1%
+14
+16
+#6000000
+0!
+0#
+0%
+04
+06
+#6100000
+1!
+1#
+1%
+14
+16
+#6200000
+0!
+0#
+0%
+04
+06
+#6300000
+1!
+1#
+1%
+b00 (
+1/
+00
+14
+16
+#6400000
+0!
+0#
+0%
+04
+06
+#6500000
+1!
+1#
+1%
+b00 '
+b10 (
+b00 *
+0/
+14
+16
+#6600000
+0!
+0#
+0%
+04
+06
+#6700000
+1!
+1#
+1%
+b10 '
+b00 (
+b00 )
+b10 *
+b00 ,
+14
+16
+#6800000
+0!
+0#
+0%
+04
+06
+#6900000
+1!
+1#
+1%
+b00 '
+b10 )
+b00 *
+b00 +
+b10 ,
+b00 .
+14
+16
+17
+#7000000
+0!
+0#
+0%
+04
+06
+#7100000
+1!
+1#
+1%
+b00 )
+b10 +
+b00 ,
+b00 -
+b10 .
+14
+16
+07
+#7200000
+0!
+0#
+0%
+04
+06
+#7300000
+1!
+1#
+1%
+b00 +
+b10 -
+b00 .
+11
+14
+16
+#7400000
+0!
+0#
+0%
+04
+06
+#7500000
+1!
+1#
+1%
+b01 (
+b00 -
+01
+14
+16
+#7600000
+0!
+0#
+0%
+04
+06
+#7700000
+1!
+1#
+1%
+b01 '
+b01 *
+10
+14
+16
+#7800000
+0!
+0#
+0%
+04
+06
+#7900000
+1!
+1#
+1%
+b01 )
+b01 ,
+14
+16
+#8000000
+0!
+0#
+0%
+04
+06
+#8100000
+1!
+1#
+1%
+b01 +
+b01 .
+14
+16
+#8200000
+0!
+0#
+0%
+04
+06
+#8300000
+1!
+1#
+1%
+b01 -
+14
+16
+#8400000
+0!
+0#
+0%
+04
+06
+#8500000
+1!
+1#
+1%
+14
+16
+#8600000
+0!
+0#
+0%
+04
+06
+#8700000
+1!
+1#
+1%
+14
+16
+#8800000
+0!
+0#
+0%
+04
+06
+#8900000
+1!
+1#
+1%
+14
+16
+#9000000
+0!
+0#
+0%
+04
+06
+#9100000
+1!
+1#
+1%
+b00 (
+1/
+00
+14
+16
+#9200000
+0!
+0#
+0%
+04
+06
+#9300000
+1!
+1#
+1%
+b00 '
+b10 (
+b00 *
+0/
+14
+16
+#9400000
+0!
+0#
+0%
+04
+06
+#9500000
+1!
+1#
+1%
+b10 '
+b00 (
+b00 )
+b10 *
+b00 ,
+14
+16
+#9600000
+0!
+0#
+0%
+04
+06
+#9700000
+1!
+1#
+1%
+b00 '
+b10 )
+b00 *
+b00 +
+b10 ,
+b00 .
+14
+16
+17
+#9800000
+0!
+0#
+0%
+04
+06
+#9900000
+1!
+1#
+1%
+b00 )
+b10 +
+b00 ,
+b00 -
+b10 .
+14
+16
+07
+#10000000
+0!
+0#
+0%
+04
+06
