@@ -2,22 +2,19 @@
 name = "text-wave"
 version = "0.1.0"
 edition = "2018"
+license = "Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-#crossterm = { version = "0.21", features = [ "serde" ] }
-crossterm = "0.21"
-#serde = { version = "1.0", features = [ "derive" ] }
-#serde_json = "1.0"
+crossterm = "0.22"
 tui = { version = "0.16", default-features = false, features = [ "crossterm" ] }
 ndarray = "0.15"
-rug = "1.13"
-#vcd = "0.6"
-#vcd = { git = "https://github.com/kevinmehall/rust-vcd" }
+rug = "1.14"
 vcd = { git = "https://github.com/kevinmehall/rust-vcd" }
 thiserror = "1.0"
 anyhow = "1.0"
 clap = { version = "3.0", features = [ "derive" ] }
-mlua = { version = "0.7", features = [ "lua54" ] }
+mlua = { version = "0.7", features = [ "lua54", "vendored" ] }
 regex = "1"
+
