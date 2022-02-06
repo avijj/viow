@@ -1,7 +1,7 @@
 viow is a cycle-based, programmable waveform viewer for the terminal inspired by
 vi and raw photo processing software.
 
-!(viow screenshot)[docs/viow_screenshot.png]
+![viow screenshot](docs/viow_screenshot.png)
 
 Waveforms, such as Value Change Dump (VCD) files, are typically generated during
 simulation of digital hardware. They record the temporal evolution of a set of
@@ -62,9 +62,8 @@ You can also install using cargo:
 $ cargo install -- path .
 ```
 
-To install Rust itself, please refer to
-[1][https://www.rust-lang.org/tools/install] or your distributions package
-manager.
+To install Rust itself, please refer to https://www.rust-lang.org/tools/install 
+or your distributions package manager.
 
 viow is using non-ASCII Unicode characters. So, the visual result may be
 different depending on what font you use in your terminal emulator. The font
@@ -92,11 +91,11 @@ embedded Lua interpreter. Load them using `require('foo')`.
 Documentation
 =============
 
-See the [docs subdirectory][docs/], in particular the [usage
-guide][docs/usage.md] for how to work with viow.
+See the [docs subdirectory](docs/), in particular the [usage
+guide](docs/usage.md) for how to work with viow.
 
 Some example waveform and Lua files are given in the [examples
-directory][examples]
+directory](examples)
 
 [1]: https://ghdl.github.io/ghdl/ghw/index.html
 [2]: https://sourcefoundry.org/hack/
