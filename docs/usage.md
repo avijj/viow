@@ -20,7 +20,7 @@ Using a Lua script
 Alternatively, you can write a Lua script to store this configuration and
 configure how the data should be presented.
 
-```
+```lua
 -- foo.lua
 
 wave = load_vcd("foo.vcd", 10, "ns")
