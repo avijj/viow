@@ -23,18 +23,18 @@ impl Config {
     fn find_config_dir() -> Option<PathBuf> {
         let mut path = PathBuf::new();
 
-        if let Ok(twv_config_home) = var("TWV_CONFIG_HOME") {
-            path.push(&twv_config_home);
+        if let Ok(viow_config_home) = var("VIOW_CONFIG_HOME") {
+            path.push(&viow_config_home);
         } else if let Ok(xdg_config_home) = var("XDG_CONFIG_HOME") {
             if !xdg_config_home.is_empty() {
                 path.push(xdg_config_home);
-                path.push("twv");
+                path.push("viow");
             }
         } else if let Ok(home) = var("HOME") {
             if !home.is_empty() {
                 path.push(home);
                 path.push(".config");
-                path.push("twv");
+                path.push("viow");
             }
         }
 
