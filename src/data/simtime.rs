@@ -44,7 +44,7 @@ pub struct SimTime {
 }
 
 impl SimTime {
-    pub fn new(v: u64, u: SimTimeUnit) -> Self {
+    pub const fn new(v: u64, u: SimTimeUnit) -> Self {
         Self {
             value: v,
             unit: u,
