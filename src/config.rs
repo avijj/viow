@@ -20,6 +20,16 @@ impl Config {
         }
     }
 
+    pub fn test_config() -> Self {
+        let config_dir = Some(PathBuf::from("./"));
+        let script_dir = Some(PathBuf::from("./"));
+
+        Self {
+            _config_dir: config_dir,
+            script_dir,
+        }
+    }
+
     fn find_config_dir() -> Option<PathBuf> {
         let mut path = PathBuf::new();
 
