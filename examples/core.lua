@@ -1,6 +1,6 @@
 require('pipeline')
 
-wave = load_vcd("core.vcd", 200, "ps")
+wave = load_vcd("core.vcd", 100, "ps")
 
 signals = {
 	"tb_core.clk",

@@ -28,8 +28,11 @@ impl VcdLoader {
         let mut parser = Parser::new(file);
 
         let header = parser.parse_header()?;
+        let timescale = header.timescale
+            .map(|(n, ts)| Self::timescale_to_simtime(n, ts))
+            .unwrap_or(SimTime::from_ps(1));
         let (signals, ids) = Self::load_all_scopes(&header);
-        let data = Self::load_all_waveforms(&mut parser, &ids, signals.len(), cycle_time);
+        let data = Self::load_all_waveforms(&mut parser, &ids, signals.len(), cycle_time, timescale);
 
         let num_cycles= data.len();
 
@@ -37,7 +40,7 @@ impl VcdLoader {
             signals,
             data,
             num_cycles,
-            cycle_time
+            cycle_time,
         })
     }
 
@@ -124,12 +127,13 @@ impl VcdLoader {
     fn load_all_waveforms<T: std::io::Read>(parser: &mut Parser<T>,
         ids: &SignalMap,
         num_signals: usize,
-        cycle_time: SimTime 
+        cycle_time: SimTime,
+        timescale: SimTime
     ) -> Vec<Vec<Integer>> {
         let mut rv: Vec<Vec<Integer>> = vec![];
         let mut vals = vec![Integer::default(); num_signals];
         let mut cur_t = 0;
-        let mut cycle_time_ts: u64 = cycle_time / SimTime::from_ps(1);
+        let mut cycle_time_ts: u64 = cycle_time / timescale;
 
         for command in parser {
             if command.is_err() {
@@ -146,10 +150,9 @@ impl VcdLoader {
                 }
 
                 Timestamp(t) => {
-                    if (t - cur_t) >= cycle_time_ts {
+                    while (t - cur_t) >= cycle_time_ts {
                         let ints: Vec<_> = vals.iter()
                             .map(|x| x.clone())
-                            //.map(Self::map_values_to_int)
                             .collect();
                         rv.push(ints);
                         cur_t += cycle_time_ts;
