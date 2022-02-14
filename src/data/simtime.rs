@@ -51,23 +51,39 @@ impl SimTime {
         }
     }
 
-    pub fn zero() -> Self {
+    pub const fn zero() -> Self {
         Self::new(0, SimTimeUnit::S)
     }
 
-    pub fn from_ps(v: u64) -> Self {
-        Self::new(v, SimTimeUnit::Ps)
+    pub const fn from_s(v: u64) -> Self {
+        Self::new(v, SimTimeUnit::S)
+    }
+    
+    pub const fn from_ms(v: u64) -> Self {
+        Self::new(v, SimTimeUnit::Ms)
+    }
+    
+    pub const fn from_us(v: u64) -> Self {
+        Self::new(v, SimTimeUnit::Us)
     }
 
-    pub fn _from_ns(v: u64) -> Self {
+    pub const fn from_ns(v: u64) -> Self {
         Self::new(v, SimTimeUnit::Ns)
     }
 
-    pub fn _get_value(&self) -> u64 {
+    pub const fn from_ps(v: u64) -> Self {
+        Self::new(v, SimTimeUnit::Ps)
+    }
+
+    pub const fn from_fs(v: u64) -> Self {
+        Self::new(v, SimTimeUnit::Fs)
+    }
+
+    pub fn get_value(&self) -> u64 {
         self.value
     }
 
-    pub fn _get_unit(&self) -> SimTimeUnit {
+    pub fn get_unit(&self) -> SimTimeUnit {
         self.unit
     }
 
@@ -101,3 +117,34 @@ impl std::ops::Div<SimTime> for SimTime {
 #[derive(Debug)]
 pub struct SimTimeRange(pub SimTime, pub SimTime);
 
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_simtime_div() {
+        let s_232 = SimTime::from_s(232);
+        let ms_13 = SimTime::from_ms(13);
+        let us_42 = SimTime::from_us(42);
+        let ns_100 = SimTime::from_ns(100);
+        let ps_10 = SimTime::from_ps(10);
+        let fs_5 = SimTime::from_fs(5);
+
+        assert_eq!(10000, ns_100 / ps_10);
+        assert_eq!(0, ps_10 / ns_100);
+
+        assert_eq!((100.0e-9 / 5.0e-15) as u64, ns_100 / fs_5);
+        assert_eq!((232.0 / 42.0e-6) as u64, s_232 / us_42);
+        assert_eq!((13.0e-3 / 10.0e-12) as u64, ms_13 / ps_10);
+    }
+
+    #[test]
+    fn test_simtime_mul() {
+        let a = SimTime::from_ms(15323);
+
+        assert_eq!(15323 * 5, (a * 5).get_value());
+        assert_eq!(15323    , (a * 1).get_value());
+        assert_eq!(15323 * 0, (a * 0).get_value());
+    }
+}
