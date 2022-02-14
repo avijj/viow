@@ -16,7 +16,7 @@ fn open_examples() {
             let path = entry.path().to_str().unwrap().to_string();
             let args = [
                 String::from("viow"),
-                String::from("--clock-period"), String::from("200"),
+                String::from("--cycle-step"), String::from("100"),
                 String::from("--timeunits"), String::from("ps"),
                 path
             ];

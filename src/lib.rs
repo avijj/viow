@@ -335,12 +335,12 @@ pub fn render_loop(stdout: std::io::Stdout, opts: Opts, config: Rc<Config>) -> R
 
 pub fn setup(opts: Opts, config: Rc<Config>) -> Result<(ScriptState, LuaInterpreter)> {
     if opts.input.ends_with(".vcd") {
-        let clock_period = opts.clock_period.ok_or(Error::MissingArgument(
-            "--clock_period".into(),
+        let cycle_step = opts.cycle_step.ok_or(Error::MissingArgument(
+            "--clock-period".into(),
             "Required to load a vcd file".into(),
         ))?;
         let opt_timeunits = opts.timeunits.trim().to_lowercase();
-        let cycle_time = SimTime::new(clock_period, SimTimeUnit::from_string(opt_timeunits)?);
+        let cycle_time = SimTime::new(cycle_step, SimTimeUnit::from_string(opt_timeunits)?);
         let loader = Box::new(VcdLoader::new(PathBuf::from(opts.input), cycle_time)?);
         let wave = Wave::load(loader)?;
 
@@ -375,9 +375,9 @@ pub struct Opts {
     /// Input file with data to display
     input: String,
 
-    /// Clock period in number of timeunits to sample displayed data
+    /// Determines how long one cycle is in timeunits
     #[clap(short, long)]
-    clock_period: Option<u64>,
+    cycle_step: Option<u64>,
 
     /// Timeunits to use to interpret times given in arguments
     #[clap(short, long, default_value = "ps")]
