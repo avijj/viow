@@ -189,21 +189,44 @@ impl State {
     }
 
     pub fn move_page_down(&mut self) {
-        if self.top_wave_row < self.data_rows - 1 {
-            let inc = std::cmp::min(self.data_rows - self.top_wave_row - self.wave_rows, self.wave_rows);
-            self.top_wave_row += inc;
-            self.cur_wave_row = self.top_wave_row;
+        if let Some(sel) = self.table_state.selected() {
+            let page_step = std::cmp::min(self.wave_rows, self.data_rows.saturating_sub(self.cur_wave_row + 1));
+
+            if self.cur_wave_row + page_step >= self.wave_rows {
+                self.top_wave_row += page_step;
+            }
+            self.cur_wave_row += page_step;
+            self.table_state.select(Some(sel + page_step));
+        } else {
             self.table_state.select(Some(0));
+            self.top_wave_row = 0;
+            self.cur_wave_row = 0;
         }
     }
 
     pub fn move_page_up(&mut self) {
-        if self.top_wave_row > 0 {
-            let dec = std::cmp::min(self.top_wave_row, self.wave_rows);
-            self.top_wave_row -= dec;
-            self.cur_wave_row = self.top_wave_row + self.wave_rows - 1;
-            self.table_state.select(Some(self.wave_rows - 1));
+        if let Some(sel) = self.table_state.selected() {
+            let page_step = std::cmp::min(self.wave_rows, self.cur_wave_row);
+
+            if self.cur_wave_row >= self.wave_rows {
+                self.top_wave_row -= page_step;
+            }
+            self.table_state.select(Some(sel - page_step));
+            self.cur_wave_row -= page_step;
+        } else {
+            let last_row = std::cmp::min(self.wave_rows, self.data_rows) - 1;
+
+            self.table_state.select(Some(last_row));
+            self.cur_wave_row = self.data_rows - 1;
+            self.top_wave_row = self.data_rows.saturating_sub(self.wave_rows);
         }
+
+        //if self.top_wave_row > 0 {
+            //let dec = std::cmp::min(self.top_wave_row, self.wave_rows);
+            //self.top_wave_row -= dec;
+            //self.cur_wave_row = self.top_wave_row + self.wave_rows - 1;
+            //self.table_state.select(Some(self.wave_rows - 1));
+        //}
     }
 
     pub fn move_page_right(&mut self) {
