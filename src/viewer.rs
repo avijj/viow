@@ -99,16 +99,12 @@ impl State {
     }
 
     pub fn set_cur_wave_col(&mut self, x: usize) {
-        if x < self.left_wave_col {
-            self.left_wave_col = x;
-        }
-
         if x >= self.data_cols {
             self.cur_wave_col = self.data_cols.saturating_sub(1);
-            self.left_wave_col = self.data_cols.saturating_sub(1 + self.wave_cols);
+            self.left_wave_col = self.data_cols.saturating_sub(self.wave_cols - 1);
         } else {
             self.cur_wave_col = x;
-            self.left_wave_col = x.saturating_sub(self.wave_cols-1);
+            self.left_wave_col = x.saturating_sub(self.wave_cols/2);
         }
     }
 
@@ -119,7 +115,7 @@ impl State {
     pub fn set_cur_wave_row(&mut self, x: usize) {
         if x < self.data_rows {
             self.cur_wave_row = x;
-            self.top_wave_row = x.saturating_sub(self.wave_rows);
+            self.top_wave_row = x.saturating_sub(self.wave_rows/2);
             self.table_state.select(Some(self.cur_wave_row - self.top_wave_row));
         } else {
             let num_rows = std::cmp::min(self.wave_rows, self.data_rows);
@@ -189,60 +185,19 @@ impl State {
     }
 
     pub fn move_page_down(&mut self) {
-        if let Some(sel) = self.table_state.selected() {
-            let page_step = std::cmp::min(self.wave_rows, self.data_rows.saturating_sub(self.cur_wave_row + 1));
-
-            if self.cur_wave_row + page_step >= self.wave_rows {
-                self.top_wave_row += page_step;
-            }
-            self.cur_wave_row += page_step;
-            self.table_state.select(Some(sel + page_step));
-        } else {
-            self.table_state.select(Some(0));
-            self.top_wave_row = 0;
-            self.cur_wave_row = 0;
-        }
+        self.set_cur_wave_row(self.cur_wave_row.saturating_add(self.wave_rows));
     }
 
     pub fn move_page_up(&mut self) {
-        if let Some(sel) = self.table_state.selected() {
-            let page_step = std::cmp::min(self.wave_rows, self.cur_wave_row);
-
-            if self.cur_wave_row >= self.wave_rows {
-                self.top_wave_row -= page_step;
-            }
-            self.table_state.select(Some(sel - page_step));
-            self.cur_wave_row -= page_step;
-        } else {
-            let last_row = std::cmp::min(self.wave_rows, self.data_rows) - 1;
-
-            self.table_state.select(Some(last_row));
-            self.cur_wave_row = self.data_rows - 1;
-            self.top_wave_row = self.data_rows.saturating_sub(self.wave_rows);
-        }
-
-        //if self.top_wave_row > 0 {
-            //let dec = std::cmp::min(self.top_wave_row, self.wave_rows);
-            //self.top_wave_row -= dec;
-            //self.cur_wave_row = self.top_wave_row + self.wave_rows - 1;
-            //self.table_state.select(Some(self.wave_rows - 1));
-        //}
+        self.set_cur_wave_row(self.cur_wave_row.saturating_sub(self.wave_rows));
     }
 
     pub fn move_page_right(&mut self) {
-        if self.left_wave_col + self.wave_cols < self.data_cols - 1 {
-            let inc = self.data_cols - self.left_wave_col - self.wave_cols;
-            self.left_wave_col += inc;
-            self.cur_wave_col = self.left_wave_col;
-        }
+        self.set_cur_wave_col(self.cur_wave_col.saturating_add(self.wave_cols));
     }
 
     pub fn move_page_left(&mut self) {
-        if self.left_wave_col > 0 {
-            let dec = std::cmp::min(self.left_wave_col, self.wave_cols);
-            self.left_wave_col -= dec;
-            self.cur_wave_col = self.left_wave_col + self.wave_cols - 1;
-        }
+        self.set_cur_wave_col(self.cur_wave_col.saturating_sub(self.wave_cols));
     }
 
     pub fn zoom_in(&mut self) {

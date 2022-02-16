@@ -41,6 +41,7 @@ fn interactive() {
 
         // no_filter.lua
         [
+            vec![char_key('+'); 4],
             vec![char_key('J'); 20],
             vec![char_key('L'); 200],
             vec![char_key('H'); 200],
