@@ -17,26 +17,29 @@ use viewer::*;
 use wave::Wave;
 
 //use anyhow::Result;
-use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent},
-};
 use clap::Parser;
-use std::rc::Rc;
+use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use std::path::PathBuf;
-use std::time::Duration;
+use std::rc::Rc;
 use tui::backend::CrosstermBackend;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::Terminal;
 
-fn event_loop_insert(
+pub struct Step {
+    pub state: ScriptState,
+    pub interpreter: LuaInterpreter,
+    pub should_exit: bool,
+}
+
+fn event_step_insert(
     ev: Event,
-    mut state: ScriptState,
-    interpreter: LuaInterpreter,
-) -> Result<((ScriptState, LuaInterpreter), bool)> {
+    step: Step,
+) -> Result<Step> {
+    let Step { mut state, interpreter, should_exit } = step;
+
     match ev {
         Event::Key(KeyEvent {
-            code: KeyCode::Esc,
-            ..
+            code: KeyCode::Esc, ..
         }) => {
             let new_name_list = state.ui.get_insert_list().unwrap().clone();
             state.wv.get_config_mut().name_list = new_name_list;
@@ -58,16 +61,15 @@ fn event_loop_insert(
         }) => {
             state.ui.enter_key();
             //if let Some(insertion) = state.ui.get_suggestion() {
-                //state.wv.get_config_mut().name_list
-                    //.push(insertion.clone());
-                //state.wv.reconfigure()?;
-                //state.wv = state.wv.reload()?;
+            //state.wv.get_config_mut().name_list
+            //.push(insertion.clone());
+            //state.wv.reconfigure()?;
+            //state.wv = state.wv.reload()?;
             //}
         }
 
         Event::Key(KeyEvent {
-            code: KeyCode::Tab,
-            ..
+            code: KeyCode::Tab, ..
         }) => {
             state.ui.next_suggestion();
         }
@@ -82,15 +84,14 @@ fn event_loop_insert(
         _ => {}
     }
 
-    Ok(((state, interpreter), false))
+    Ok(Step { state, interpreter, should_exit })
 }
 
-fn event_loop_normal(
+fn event_step_normal(
     ev: Event,
-    mut state: ScriptState,
-    mut interpreter: LuaInterpreter,
-) -> Result<((ScriptState, LuaInterpreter), bool)> {
-    let mut should_exit = false;
+    step: Step
+) -> Result<Step> {
+    let Step { mut state, mut interpreter, mut should_exit } = step;
 
     if state.ui.in_command() {
         match ev {
@@ -230,78 +231,40 @@ fn event_loop_normal(
                 state.wv.reconfigure()?;
                 state.wv = state.wv.reload()?;
                 let insert_at = state.ui.get_cur_wave_row();
-                state.ui.start_insert_mode(unfiltered, state.wv.get_names().clone(), insert_at);
+                state
+                    .ui
+                    .start_insert_mode(unfiltered, state.wv.get_names().clone(), insert_at);
             }
 
             _ => {}
         }
     }
 
-    Ok(((state, interpreter), should_exit))
+    Ok(Step { state, interpreter, should_exit })
 }
 
-fn event_loop(
-    state: ScriptState,
-    interpreter: LuaInterpreter,
-) -> Result<((ScriptState, LuaInterpreter), bool)> {
-    if event::poll(Duration::from_millis(200))? {
-        let ev = event::read()?;
-        //let state = interpreter.state_mut();
-
-        if state.ui.in_insert_mode() {
-            event_loop_insert(ev, state, interpreter)
-        } else {
-            event_loop_normal(ev, state, interpreter)
-        }
+pub fn event_step(step: Step, ev: Event) -> Result<Step> {
+    if step.state.ui.in_insert_mode() {
+        event_step_insert(ev, step)
     } else {
-        Ok(((state, interpreter), false))
+        event_step_normal(ev, step)
     }
 }
 
-pub fn render_loop(stdout: std::io::Stdout, opts: Opts, config: Rc<Config>) -> Result<()> {
+
+#[cfg(not(tarpaulin_include))]
+pub fn main_loop(stdout: std::io::Stdout, opts: Opts, config: Rc<Config>) -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
-    let (mut state, mut interpreter) = setup(opts, config)?;
+    let mut step = setup(opts, config)?;
+
     loop {
-        terminal.draw(|f| {
-            let size = f.size();
-            let stack = Layout::default()
-                .direction(Direction::Vertical)
-                .margin(0)
-                .constraints([
-                    Constraint::Min(1),
-                    Constraint::Length(1),
-                    Constraint::Length(1),
-                ])
-                .split(size);
+        step = render_step(&mut terminal, step)?;
+        step = event_step(step, event::read()?)?;
 
-            state.ui.resize(stack[0].width.saturating_sub(48), stack[0].height.saturating_sub(2));
-            state
-                .ui
-                .data_size(state.wv.num_signals(), state.wv.num_cycles());
-
-            if state.ui.in_insert_mode() {
-                render_insert(f, &stack[0], &mut state.ui);
-            } else {
-                let table = build_table(&state.wv, &state.ui);
-                f.render_stateful_widget(table, size, state.ui.get_mut_table_state());
-            }
-
-            let statusline = build_statusline(&state.ui);
-            f.render_widget(statusline, stack[1]);
-
-            let commandline = build_commandline(&state.ui);
-            f.render_widget(commandline, stack[2]);
-        })?;
-
-        // check events
-        let ((new_state, new_interpreter), should_exit) = event_loop(state, interpreter)?;
-        state = new_state;
-        interpreter = new_interpreter;
-
-        if should_exit {
+        if step.should_exit {
             break;
         }
     }
@@ -309,7 +272,54 @@ pub fn render_loop(stdout: std::io::Stdout, opts: Opts, config: Rc<Config>) -> R
     Ok(())
 }
 
-pub fn setup(opts: Opts, config: Rc<Config>) -> Result<(ScriptState, LuaInterpreter)> {
+pub fn render_step(
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    step: Step,
+) -> Result<Step> {
+    let Step { mut state, interpreter, should_exit } = step;
+
+    terminal.draw(|f| {
+        let size = f.size();
+        let stack = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(0)
+            .constraints([
+                Constraint::Min(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ])
+            .split(size);
+
+        state.ui.resize(
+            stack[0].width.saturating_sub(48),
+            stack[0].height.saturating_sub(2),
+        );
+        state
+            .ui
+            .data_size(state.wv.num_signals(), state.wv.num_cycles());
+
+        if state.ui.in_insert_mode() {
+            render_insert(f, &stack[0], &mut state.ui);
+        } else {
+            let table = build_table(&state.wv, &state.ui);
+            f.render_stateful_widget(table, size, state.ui.get_mut_table_state());
+        }
+
+        let statusline = build_statusline(&state.ui);
+        f.render_widget(statusline, stack[1]);
+
+        let commandline = build_commandline(&state.ui);
+        f.render_widget(commandline, stack[2]);
+    })?;
+
+    Ok(Step {
+        state,
+        interpreter,
+        should_exit
+    })
+}
+
+pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
     if opts.input.ends_with(".vcd") {
         let cycle_step = opts.cycle_step.ok_or(Error::MissingArgument(
             "--clock-period".into(),
@@ -327,7 +337,8 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<(ScriptState, LuaInterpre
         };
         let interpreter = LuaInterpreter::new(&config)?;
 
-        Ok((state, interpreter))
+        let step = Step { state, interpreter, should_exit: false };
+        Ok(step)
     } else if opts.input.ends_with(".lua") {
         let loader = Box::new(EmptyLoader::new());
         let wave = Wave::load(loader)?;
@@ -339,7 +350,8 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<(ScriptState, LuaInterpre
         let mut interpreter = LuaInterpreter::new(&config)?;
         let state = interpreter.run_file(state, opts.input)?;
 
-        Ok((state, interpreter))
+        let step = Step { state, interpreter, should_exit: false };
+        Ok(step)
     } else {
         Err(Error::UnknownFileFormat(opts.input.clone()))
     }
@@ -359,4 +371,3 @@ pub struct Opts {
     #[clap(short, long, default_value = "ps")]
     timeunits: String,
 }
-
