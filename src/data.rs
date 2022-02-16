@@ -1,4 +1,3 @@
-pub mod transforms;
 mod simtime;
 
 pub use simtime::*;
@@ -58,7 +57,7 @@ pub trait Sample {
 pub trait Transform {
     type Value;
 
-    fn transform(&self, value: &mut Self::Value);
+    fn transform(&self, _value: &mut Self::Value) {}
 }
 
 pub trait TranslateSignals<I> {

@@ -284,30 +284,6 @@ pub fn render_loop(stdout: std::io::Stdout, opts: Opts, config: Rc<Config>) -> R
 
             if state.ui.in_insert_mode() {
                 render_insert(f, &stack[0], &mut state.ui);
-                /*let vsplit = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .margin(0)
-                    .constraints([
-                        Constraint::Ratio(1,2),
-                        Constraint::Ratio(1,2)
-                    ])
-                    .split(stack[0]);
-                let right = Layout::default()
-                    .direction(Direction::Vertical)
-                    .margin(0)
-                    .constraints([
-                        Constraint::Length(1),
-                        Constraint::Min(1),
-                    ])
-                    .split(vsplit[1]);
-
-                let (suggestion_state, signals_state) = state.ui.insert_widget_states().unwrap();
-                let (list, suggestions, prompt) = build_insert(&state.ui);
-                //let (list, suggestions, prompt) = build_insert(&state.ui);
-                f.render_widget(list, vsplit[0]);
-                f.render_widget(prompt, right[0]);
-
-                f.render_stateful_widget(suggestions, right[1], suggestion_state);*/
             } else {
                 let table = build_table(&state.wv, &state.ui);
                 f.render_stateful_widget(table, size, state.ui.get_mut_table_state());
