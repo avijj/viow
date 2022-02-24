@@ -319,7 +319,8 @@ pub fn render_step(
         if state.ui.in_insert_mode() {
             render_insert(f, &stack[0], &mut state.ui);
         } else {
-            let table = build_table(&state.wv, &state.ui);
+            let (constraint, table) = build_table(&state.wv, &state.ui);
+            let table = table.widths(&constraint);
             f.render_stateful_widget(table, size, state.ui.get_mut_table_state());
         }
 

@@ -413,7 +413,7 @@ impl State {
 }
 
 
-pub fn build_table<'a>(wave: &'a Wave, state: &State) -> Table<'a> {
+pub fn build_table<'a>(wave: &'a Wave, state: &State) -> ([Constraint; 3], Table<'a>) {
     let even_style = Style::default()
         .fg(Color::Black)
         .bg(Color::White);
@@ -435,6 +435,9 @@ pub fn build_table<'a>(wave: &'a Wave, state: &State) -> Table<'a> {
     let left = state.left_wave_col;
     let right = std::cmp::min(state.left_wave_col + state.wave_cols, wave.num_cycles());
 
+    let mut max_name_width = 0u16;
+    let mut max_value_width = 0u16;
+
     for row_i in top..bot {
         let fmt = build_waveform(wave.slice_of_signal(row_i, left, right), wave.formatter(row_i), state.zoom);
         let cur_cycle = (state.cur_wave_col - state.left_wave_col) * state.zoom;
@@ -444,14 +447,22 @@ pub fn build_table<'a>(wave: &'a Wave, state: &State) -> Table<'a> {
 
         let ref cur_style = if row_i % 2 == 0 { even_style } else { odd_style };
 
-        let name_cell = Cell::from(wave.name(row_i).unwrap_or("⁇⁇⁇"))
+        let name = wave.name(row_i).unwrap_or("⁇⁇⁇");
+        if name.len() as u16 > max_name_width {
+            max_name_width = name.len() as u16;
+        }
+        let name_cell = Cell::from(name)
             .style(*cur_style);
-        //let name_cell = Cell::from(format!("row_{}", row_i))
-            //.style(*cur_style);
-        let value_cell = wave.value(row_i, state.cur_wave_col)
-            .map(|val| Cell::from(format!("0x{:>8x}", val)))
-            .unwrap_or(Cell::from("⁇"))
+
+        let value_txt = wave.value(row_i, state.cur_wave_col)
+            .map(|val| format!("0x{:>8x}", val))
+            .unwrap_or("⁇".to_string());
+        if value_txt.len() as u16 > max_value_width {
+            max_value_width = value_txt.len() as u16;
+        }
+        let value_cell = Cell::from(value_txt)
             .style(*cur_style);
+
         let wave_cell = Cell::from(Spans::from(vec![
                 Span::raw(s_pre),
                 Span::styled(s_cur, cursor_style),
@@ -462,13 +473,23 @@ pub fn build_table<'a>(wave: &'a Wave, state: &State) -> Table<'a> {
         rows.push(Row::new(vec![name_cell, value_cell, wave_cell]));
     }
 
-    Table::new(rows)
-        .header(Row::new(vec!["Name", "Value", "Waveform"])
-            .style(Style::default().fg(Color::Yellow))
-            .bottom_margin(0))
-        .widths(&[Constraint::Min(37), Constraint::Length(11), Constraint::Ratio(1, 1)])
-        .column_spacing(0)
-        .highlight_style(hi_style)
+    let constraint = [
+        Constraint::Min(max_name_width),
+        Constraint::Length(max_value_width),
+        Constraint::Ratio(1, 1)
+    ];
+
+    // This is necessary due to tui's API. We need to pass constraint as reference. We can't pass a
+    // reference to function owned variable.
+    (
+        constraint,
+        Table::new(rows)
+            .header(Row::new(vec!["Name", "Value", "Waveform"])
+                .style(Style::default().fg(Color::Yellow))
+                .bottom_margin(0))
+            .column_spacing(1)
+            .highlight_style(hi_style)
+    )
 }
 
 pub fn build_statusline(state: &State) -> Paragraph {
