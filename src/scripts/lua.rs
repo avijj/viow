@@ -71,7 +71,7 @@ impl LuaInterpreter {
 #[derive(Clone)]
 struct View {
     cursor_col: usize,
-    cursor_row: usize,
+    cursor_row: Option<usize>,
 }
 
 impl View {

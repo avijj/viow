@@ -108,25 +108,31 @@ impl State {
         }
     }
 
-    pub fn get_cur_wave_row(&self) -> usize {
-        self.cur_wave_row
+    pub fn get_cur_wave_row(&self) -> Option<usize> {
+        self.table_state.selected()
     }
 
-    pub fn set_cur_wave_row(&mut self, x: usize) {
-        if x < self.data_rows {
-            self.cur_wave_row = x;
-            self.top_wave_row = x.saturating_sub(self.wave_rows/2);
-            self.table_state.select(Some(self.cur_wave_row - self.top_wave_row));
-        } else {
-            let num_rows = std::cmp::min(self.wave_rows, self.data_rows);
-
-            if num_rows > 0 {
-                self.table_state.select(Some(num_rows - 1));
+    pub fn set_cur_wave_row(&mut self, x: Option<usize>) {
+        if let Some(x) = x {
+            if x < self.data_rows {
+                self.cur_wave_row = x;
+                self.top_wave_row = x.saturating_sub(self.wave_rows/2);
+                self.table_state.select(Some(self.cur_wave_row - self.top_wave_row));
             } else {
-                self.table_state.select(None);
+                let num_rows = std::cmp::min(self.wave_rows, self.data_rows);
+
+                if num_rows > 0 {
+                    self.table_state.select(Some(num_rows - 1));
+                } else {
+                    self.table_state.select(None);
+                }
+                self.cur_wave_row = self.data_rows.saturating_sub(1);
+                self.top_wave_row = self.data_rows.saturating_sub(self.wave_rows);
             }
-            self.cur_wave_row = self.data_rows.saturating_sub(1);
-            self.top_wave_row = self.data_rows.saturating_sub(self.wave_rows);
+        } else {
+            self.cur_wave_row = 0;
+            self.top_wave_row = 0;
+            self.table_state.select(None);
         }
     }
 
@@ -185,11 +191,11 @@ impl State {
     }
 
     pub fn move_page_down(&mut self) {
-        self.set_cur_wave_row(self.cur_wave_row.saturating_add(self.wave_rows));
+        self.set_cur_wave_row(Some(self.cur_wave_row.saturating_add(self.wave_rows)));
     }
 
     pub fn move_page_up(&mut self) {
-        self.set_cur_wave_row(self.cur_wave_row.saturating_sub(self.wave_rows));
+        self.set_cur_wave_row(Some(self.cur_wave_row.saturating_sub(self.wave_rows)));
     }
 
     pub fn move_page_right(&mut self) {
