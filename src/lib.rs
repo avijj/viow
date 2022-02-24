@@ -339,12 +339,13 @@ pub fn render_step(
 
 pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
     if opts.input.ends_with(".vcd") {
-        let cycle_step = opts.cycle_step.ok_or(Error::MissingArgument(
-            "--clock-period".into(),
-            "Required to load a vcd file".into(),
-        ))?;
-        let opt_timeunits = opts.timeunits.trim().to_lowercase();
-        let cycle_time = SimTime::new(cycle_step, SimTimeUnit::from_string(opt_timeunits)?);
+        //let cycle_step = opts.cycle_step.ok_or(Error::MissingArgument(
+            //"--clock-period".into(),
+            //"Required to load a vcd file".into(),
+        //))?;
+        let timeunits = SimTimeUnit::from_string(opts.timeunits.trim().to_lowercase())?;
+        let cycle_time = opts.cycle_step
+            .map(|cs| SimTime::new(cs, timeunits));
         let loader = Box::new(VcdLoader::new(PathBuf::from(opts.input), cycle_time)?);
         let wave = Wave::load(loader)?;
 

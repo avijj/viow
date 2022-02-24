@@ -174,7 +174,7 @@ mod test {
     use crate::load::vcd::VcdLoader;
 
     fn make_test_wave() -> Result<Wave> {
-        let loader = Box::new(VcdLoader::new("examples/verilator.vcd", SimTime::from_ps(1))?);
+        let loader = Box::new(VcdLoader::new("examples/verilator.vcd", Some(SimTime::from_ps(1)))?);
         let wave = Wave::load(loader)?;
 
         Ok(wave)

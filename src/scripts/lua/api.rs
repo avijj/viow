@@ -5,7 +5,7 @@ pub(super) fn load_vcd<'callback>(_lua: &'callback Lua, args: (String, u64, Stri
 {
     let (filename, period, timeunit) = args;
     let cycle_time = SimTime::new(period, SimTimeUnit::from_string(timeunit)?);
-    let loader = Box::new(VcdLoader::new(PathBuf::from(filename), cycle_time)?);
+    let loader = Box::new(VcdLoader::new(PathBuf::from(filename), Some(cycle_time))?);
     let new_wave = Wave::load(loader)?;
     Ok(new_wave)
 }

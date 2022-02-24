@@ -12,7 +12,7 @@ fn load_vcd_test() {
     const FILE_NAME: &'static str = "examples/core.vcd";
     const CYCLE_TIME: SimTime = SimTime::new(100, SimTimeUnit::Ps);
 
-    let loader = Box::new(VcdLoader::new(PathBuf::from(FILE_NAME), CYCLE_TIME).unwrap());
+    let loader = Box::new(VcdLoader::new(PathBuf::from(FILE_NAME), Some(CYCLE_TIME)).unwrap());
     let wave = Wave::load(loader).unwrap();
 
     assert_eq!(100, wave.num_cycles());
@@ -42,7 +42,7 @@ fn load_vcd_cycletime_test() {
     const FILE_NAME: &'static str = "examples/core.vcd";
     const CYCLE_TIME: SimTime = SimTime::new(50, SimTimeUnit::Ps);
 
-    let loader = Box::new(VcdLoader::new(PathBuf::from(FILE_NAME), CYCLE_TIME).unwrap());
+    let loader = Box::new(VcdLoader::new(PathBuf::from(FILE_NAME), Some(CYCLE_TIME)).unwrap());
     let wave = Wave::load(loader).unwrap();
 
     assert_eq!(200, wave.num_cycles());

@@ -1,13 +1,13 @@
 use super::*;
-use crate::formatting::WaveFormat;
 use crate::data::*;
+use crate::formatting::WaveFormat;
 
-use rug::Assign;
-use std::path::Path;
-use std::fs::File;
-use std::collections::HashMap;
-use ::vcd::{ self, Parser, ScopeItem, Header, Value };
+use ::vcd::{self, Header, Parser, ScopeItem, Value};
 use ndarray::prelude::*;
+use rug::Assign;
+use std::collections::HashMap;
+use std::fs::File;
+use std::path::Path;
 
 struct SignalInfo {
     index: usize,
@@ -23,24 +23,35 @@ pub struct VcdLoader {
 }
 
 impl VcdLoader {
-    pub fn new(filename: impl AsRef<Path>, cycle_time: SimTime) -> Result<Self> {
+    pub fn new(filename: impl AsRef<Path>, cycle_time: Option<SimTime>) -> Result<Self> {
         let file = File::open(filename.as_ref())?;
         let mut parser = Parser::new(file);
 
         let header = parser.parse_header()?;
-        let timescale = header.timescale
+        let timescale = header
+            .timescale
             .map(|(n, ts)| Self::timescale_to_simtime(n, ts))
             .unwrap_or(SimTime::from_ps(1));
         let (signals, ids) = Self::load_all_scopes(&header);
-        let data = Self::load_all_waveforms(&mut parser, &ids, signals.len(), cycle_time, timescale);
+        let (eff_cycle_time, data) = if let Some(cycle_time) = cycle_time {
+            (
+                cycle_time,
+                Self::load_all_waveforms(&mut parser, &ids, signals.len(), cycle_time, timescale),
+            )
+        } else {
+            (
+                timescale,
+                Self::load_all_waveforms(&mut parser, &ids, signals.len(), timescale, timescale),
+            )
+        };
 
-        let num_cycles= data.len();
+        let num_cycles = data.len();
 
         Ok(Self {
             signals,
             data,
             num_cycles,
-            cycle_time,
+            cycle_time: eff_cycle_time,
         })
     }
 
@@ -64,7 +75,7 @@ impl VcdLoader {
                             rv.push(SignalDeclaration { name, format });
 
                             let info = SignalInfo {
-                                index: rv.len()-1,
+                                index: rv.len() - 1,
                             };
 
                             sigmap.insert(var.code, info);
@@ -77,7 +88,11 @@ impl VcdLoader {
 
                         ScopeItem::Comment(comment) => {
                             rv.push(SignalDeclaration {
-                                name: format!("-- {}: {}", prefix.strip_suffix(".").unwrap_or(""), comment),
+                                name: format!(
+                                    "-- {}: {}",
+                                    prefix.strip_suffix(".").unwrap_or(""),
+                                    comment
+                                ),
                                 format: WaveFormat::Comment,
                             });
                         }
@@ -94,18 +109,18 @@ impl VcdLoader {
     fn map_values_to_int(target: &mut Integer, x: &Value) {
         match *x {
             Value::V1 => target.assign(1),
-            _ => target.assign(0)
+            _ => target.assign(0),
         }
     }
 
     fn map_vec_to_int(target: &mut Integer, x: &Vec<Value>) {
         target.assign(0);
-        for (i,bit) in x.iter().enumerate() {
+        for (i, bit) in x.iter().enumerate() {
             let val = match *bit {
                 Value::V1 => true,
-                _ => false
+                _ => false,
             };
-            
+
             target.set_bit((x.len() - 1 - i) as u32, val);
         }
     }
@@ -124,11 +139,12 @@ impl VcdLoader {
         SimTime::new(ts as u64, u)
     }
 
-    fn load_all_waveforms<T: std::io::Read>(parser: &mut Parser<T>,
+    fn load_all_waveforms<T: std::io::Read>(
+        parser: &mut Parser<T>,
         ids: &SignalMap,
         num_signals: usize,
         cycle_time: SimTime,
-        timescale: SimTime
+        timescale: SimTime,
     ) -> Vec<Vec<Integer>> {
         let mut rv: Vec<Vec<Integer>> = vec![];
         let mut vals = vec![Integer::default(); num_signals];
@@ -151,9 +167,7 @@ impl VcdLoader {
 
                 Timestamp(t) => {
                     while (t - cur_t) >= cycle_time_ts {
-                        let ints: Vec<_> = vals.iter()
-                            .map(|x| x.clone())
-                            .collect();
+                        let ints: Vec<_> = vals.iter().map(|x| x.clone()).collect();
                         rv.push(ints);
                         cur_t += cycle_time_ts;
                     }
@@ -171,7 +185,7 @@ impl VcdLoader {
                     }
                 }
 
-                _ => ()
+                _ => (),
             }
         }
 
@@ -179,13 +193,11 @@ impl VcdLoader {
     }
 }
 
-
 impl LoadDeclarations for VcdLoader {
     fn load_declarations(&self) -> Result<Vec<SignalDeclaration>> {
         Ok(self.signals.clone())
     }
 }
-
 
 impl LoadLength for VcdLoader {
     fn load_length(&self) -> Result<usize> {
@@ -193,13 +205,11 @@ impl LoadLength for VcdLoader {
     }
 }
 
-
 impl LoadWaveform for VcdLoader {
     fn load_waveform(&self, name: impl AsRef<str>, cycles: Range<usize>) -> Result<Vec<Integer>> {
         let mut rv = Vec::with_capacity(cycles.len());
 
-        let pos = self.signals.iter()
-            .position(|x| x.name == name.as_ref());
+        let pos = self.signals.iter().position(|x| x.name == name.as_ref());
 
         if let Some(pos) = pos {
             if cycles.end > self.num_cycles {
@@ -217,7 +227,7 @@ impl LoadWaveform for VcdLoader {
     }
 }
 
-// 
+//
 // new style traits
 //
 
@@ -226,11 +236,13 @@ impl QuerySource for VcdLoader {
     type IntoSignalIter = Vec<Signal<Self::Id>>;
 
     fn query_signals(&self) -> Result<Self::IntoSignalIter> {
-        let rv: Self::IntoSignalIter = self.signals.iter()
+        let rv: Self::IntoSignalIter = self
+            .signals
+            .iter()
             .map(|decl| Signal {
                 id: decl.name.clone(),
                 name: decl.name.clone(),
-                format: decl.format.clone()
+                format: decl.format.clone(),
             })
             .collect();
 
@@ -250,12 +262,11 @@ impl LookupId for VcdLoader {
     type ToId = usize;
 
     fn lookup_id(&self, id: &Self::FromId) -> Result<Self::ToId> {
-        let pos = self.signals.iter()
-            .position(|x| x.name == *id);
+        let pos = self.signals.iter().position(|x| x.name == *id);
 
         match pos {
             Some(p) => Ok(p),
-            None => Err(Error::NotFound(id.clone()))
+            None => Err(Error::NotFound(id.clone())),
         }
     }
 
@@ -263,7 +274,7 @@ impl LookupId for VcdLoader {
         if *id < self.signals.len() {
             Ok(self.signals[*id].name.clone())
         } else {
-            Err(Error::IdOutOfRange(*id, self.signals.len()-1))
+            Err(Error::IdOutOfRange(*id, self.signals.len() - 1))
         }
     }
 }
@@ -272,14 +283,18 @@ impl Sample for VcdLoader {
     type Id = String;
     type Value = Integer;
 
-    fn sample(&self, ids: &Vec<Self::Id>, times: &SimTimeRange) -> Result<CycleValues<Self::Value>> {
+    fn sample(
+        &self,
+        ids: &Vec<Self::Id>,
+        times: &SimTimeRange,
+    ) -> Result<CycleValues<Self::Value>> {
         let start_cycle = (times.0 / self.cycle_time) as usize;
         let stop_cycle = (times.1 / self.cycle_time) as usize;
 
         let mut data = Array2::default((stop_cycle - start_cycle, ids.len()));
         for (i, id) in ids.iter().enumerate() {
             let wv = self.load_waveform(id, start_cycle..stop_cycle)?;
-            data.slice_mut(s![..,i]).assign(&Array1::from_vec(wv));
+            data.slice_mut(s![.., i]).assign(&Array1::from_vec(wv));
         }
 
         Ok(data)
@@ -287,4 +302,3 @@ impl Sample for VcdLoader {
 }
 
 impl Source<String, usize, Integer> for VcdLoader {}
-
