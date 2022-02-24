@@ -107,6 +107,38 @@ impl Wave {
     pub fn reload(self) -> Result<Self> {
         Self::load_from_pipe(self.pipe, self.config)
     }
+
+    /// Find the next transition for a single signal
+    ///
+    /// * `signal_index` - Row of the signal
+    /// * `start_cycle` - First cycle within row to begin search
+    ///
+    /// Find the next cycle of the current signal's trace that is not equal to the value at
+    /// `start_cycle`.
+    pub fn next_transition(&self, signal_index: usize, start_cycle: usize) -> Option<usize> {
+        let col = self.data.column(signal_index);
+        let cur_val = &col[start_cycle];
+        col.slice(s![start_cycle..])
+            .iter()
+            .position(|x| *x != *cur_val)
+            .map(|x| x + start_cycle)
+    }
+
+    /// Find the first previous transition for a single signal
+    ///
+    /// * `signal_index` - Row of the signal
+    /// * `start_cycle` - First cycle within row to begin search
+    ///
+    /// Find the first preceding cycle of the current signal's trace that is not equal to the value
+    /// at `start_cycle`.
+    pub fn prev_transition(&self, signal_index: usize, start_cycle: usize) -> Option<usize> {
+        let col = self.data.column(signal_index);
+        let cur_val = &col[start_cycle];
+        col.slice(s![0..start_cycle+1; -1])
+            .iter()
+            .position(|x| *x != *cur_val)
+            .map(|offset| start_cycle - offset)
+    }
 }
 
 
@@ -136,3 +168,44 @@ impl<'a> Iterator for SliceIter<'a> {
     }
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::load::vcd::VcdLoader;
+
+    fn make_test_wave() -> Result<Wave> {
+        let loader = Box::new(VcdLoader::new("examples/verilator.vcd", SimTime::from_ps(1))?);
+        let wave = Wave::load(loader)?;
+
+        Ok(wave)
+    }
+
+    #[test]
+    fn test_example_wave_data() {
+        let wave = make_test_wave()
+            .expect("Failed to load test wave data");
+
+        assert_eq!(Some(&Integer::from(0)), wave.value(7, 0));
+        assert_eq!(Some(&Integer::from(1)), wave.value(7, 1));
+        assert_eq!(Some(&Integer::from(1)), wave.value(7, 40));
+        assert_eq!(Some(&Integer::from(0)), wave.value(7, 41));
+
+        let col = wave.data.column(7);
+
+        assert_eq!(Integer::from(0), col[0]);
+        assert_eq!(Integer::from(1), col[1]);
+        assert_eq!(Integer::from(1), col[40]);
+        assert_eq!(Integer::from(0), col[41]);
+    }
+
+    #[test]
+    fn test_transitions() {
+        let wave = make_test_wave()
+            .expect("Failed to load test wave data");
+
+        assert_eq!(Some(1), wave.next_transition(7, 0));
+        assert_eq!(Some(41), wave.next_transition(7, 1));
+
+        assert_eq!(Some(0), wave.prev_transition(7, 40));
+    }
+}

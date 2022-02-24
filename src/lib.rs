@@ -193,6 +193,20 @@ fn event_step_normal(
                 state.ui.move_page_right();
             }
 
+            // next transition
+            Event::Key(KeyEvent { code: KeyCode::Char('w'), .. }) => {
+                if let Some(next) = state.wv.next_transition(state.ui.get_cur_wave_row(), state.ui.get_cur_wave_col()) {
+                    state.ui.set_cur_wave_col(next);
+                }
+            }
+
+            // prev transition
+            Event::Key(KeyEvent { code: KeyCode::Char('b'), .. }) => {
+                if let Some(prev) = state.wv.prev_transition(state.ui.get_cur_wave_row(), state.ui.get_cur_wave_col()) {
+                    state.ui.set_cur_wave_col(prev);
+                }
+            }
+
             // zoom in '+'
             Event::Key(KeyEvent {
                 code: KeyCode::Char('+'),
