@@ -72,6 +72,7 @@ Normal mode
   as one character wide. When zooming, with is doubled/halfed.
 - `:`: Enter a Lua command in the prompt at the bottom.
 - `i`: Enter insert mode before current cursor position.
+- `t`: Toggle between value representations of current signal under cursor.
 
 Insert mode
 -----------

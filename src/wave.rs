@@ -1,5 +1,5 @@
 use crate::error::*;
-use crate::formatting::WaveFormat;
+use crate::formatting::{WaveFormat,format_value};
 use crate::data::*;
 use crate::pipeline::*;
 
@@ -71,8 +71,20 @@ impl Wave {
         self.formatters[signal_index]
     }
 
+    pub fn set_formatter(&mut self, signal_index: usize, format: WaveFormat) {
+        self.formatters[signal_index] = format;
+    }
+
     pub fn value<'a>(&'a self, signal_index: usize, cycle: usize) -> Option<&'a Integer> {
         self.data.get([cycle, signal_index])
+    }
+
+    pub fn formatted_value(&self, signal_index: usize, cycle: usize) -> Option<String> {
+        self.value(signal_index, cycle)
+            .map(|val| {
+                let format = self.formatters[signal_index];
+                format_value(val, format)
+            })
     }
 
     pub fn name<'a>(&'a self, signal_index: usize) -> Option<&'a str> {

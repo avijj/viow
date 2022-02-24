@@ -69,7 +69,7 @@ impl VcdLoader {
                             let format = if var.size == 1 {
                                 WaveFormat::Bit
                             } else {
-                                WaveFormat::Vector
+                                WaveFormat::Vector(var.size)
                             };
 
                             rv.push(SignalDeclaration { name, format });

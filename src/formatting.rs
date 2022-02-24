@@ -3,7 +3,8 @@ use rug::Integer;
 #[derive(Clone,Copy,PartialEq)]
 pub enum WaveFormat {
     Bit,
-    Vector,
+    Vector(u32),
+    BitVector(u32),
     Comment,
 }
 
@@ -15,6 +16,17 @@ fn build_waveform_vec<'a, T>(line_data: T, zoom: usize) -> String
         .map(|x| core::iter::repeat(x).take(zoom))
         .flatten()
         .fold(FormatAcc::new(), format_vec)
+        .msg
+}
+
+fn build_waveform_bitvec<'a, T>(line_data: T, zoom: usize) -> String 
+    where
+        T: Iterator<Item = &'a Integer>
+{
+    line_data
+        .map(|x| core::iter::repeat(x).take(zoom))
+        .flatten()
+        .fold(FormatAcc::new(), format_bitvec)
         .msg
 }
 
@@ -44,8 +56,26 @@ pub fn build_waveform<'a, T>(line_data: T, format: WaveFormat, zoom: usize) -> S
 {
     match format {
         WaveFormat::Bit => build_waveform_bit(line_data, zoom),
-        WaveFormat::Vector => build_waveform_vec(line_data, zoom),
+        WaveFormat::Vector(_) => build_waveform_vec(line_data, zoom),
+        WaveFormat::BitVector(_) => build_waveform_bitvec(line_data, zoom),
         WaveFormat::Comment => build_waveform_comment(line_data, zoom),
+    }
+}
+
+
+pub fn format_value(value: &Integer, format: WaveFormat) -> String {
+    match format {
+        WaveFormat::Bit => format!("{:b}", value),
+        WaveFormat::Vector(size) => {
+            let hex_digits = if size % 4 == 0 {
+                size / 4
+            } else {
+                size / 4 + 1
+            };
+            format!("{:#0width$x}", value, width = (hex_digits as usize) + 2)
+        }
+        WaveFormat::BitVector(size) => format!("{:#0width$b}", value, width = size as usize + 2),
+        WaveFormat::Comment => "".to_string(),
     }
 }
 
@@ -74,10 +104,21 @@ impl FormatAcc {
     }
 }
 
-fn format_vec(mut acc: FormatAcc, value: &Integer) -> FormatAcc {
+fn format_vec(acc: FormatAcc, value: &Integer) -> FormatAcc {
+    format_folder(acc, value, WaveFormat::Vector(0))
+}
+
+fn format_bitvec(acc: FormatAcc, value: &Integer) -> FormatAcc {
+    format_folder(acc, value, WaveFormat::BitVector(0))
+}
+
+fn format_folder(mut acc: FormatAcc, value: &Integer, format: WaveFormat) -> FormatAcc {
     let emit;
 
-    let val = format!("{:x}", *value);
+    let val = match format {
+        WaveFormat::BitVector(_) => format!("{:b}", *value),
+        _ => format!("{:x}", *value)
+    };
     let val_len = val.chars().count();
 
     if let Some(last) = acc.last {

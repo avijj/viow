@@ -15,6 +15,7 @@ use load::{empty::EmptyLoader, vcd::VcdLoader};
 use scripts::{lua::LuaInterpreter, RunCommand, ScriptState};
 use viewer::*;
 use wave::Wave;
+use formatting::WaveFormat;
 
 //use anyhow::Result;
 use clap::Parser;
@@ -252,6 +253,23 @@ fn event_step_normal(
                 state
                     .ui
                     .start_insert_mode(unfiltered, state.wv.get_names().clone(), insert_at);
+            }
+
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('t'),
+                ..
+            }) => {
+                if let Some(cur_row) = state.ui.get_cur_wave_row() {
+                    let cur_fmt = state.wv.formatter(cur_row);
+                    let next_fmt = match cur_fmt {
+                        WaveFormat::Vector(sz) => WaveFormat::BitVector(sz),
+                        WaveFormat::BitVector(sz) => WaveFormat::Vector(sz),
+
+                        other => other
+                    };
+
+                    state.wv.set_formatter(cur_row, next_fmt);
+                }
             }
 
             _ => {}
