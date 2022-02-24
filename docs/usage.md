@@ -67,6 +67,7 @@ Normal mode
 - `q`: Quit viow.
 - `h, j, k, l`: Vi like movement of the cursor.
 - `H, J, K, L`: Capital versions jump a page at a time.
+- `w/b`: Jump to next/previous transition of signal under cursor.
 - `+/-`: Zoom in/out on the temporal grid. Initially, one time-step is presented
   as one character wide. When zooming, with is doubled/halfed.
 - `:`: Enter a Lua command in the prompt at the bottom.
