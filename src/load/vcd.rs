@@ -1,6 +1,9 @@
-use super::*;
 use crate::data::*;
 use crate::formatting::WaveFormat;
+use crate::error::*;
+
+use rug::Integer;
+use std::ops::Range;
 
 use ::vcd::{self, Header, Parser, ScopeItem, Value};
 use ndarray::prelude::*;
