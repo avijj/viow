@@ -13,6 +13,12 @@ struct SignalInfo {
     index: usize,
 }
 
+#[derive(Clone)]
+struct SignalDeclaration {
+    pub name: String,
+    pub format: WaveFormat,
+}
+
 type SignalMap = HashMap<vcd::IdCode, SignalInfo>;
 
 pub struct VcdLoader {
@@ -191,21 +197,7 @@ impl VcdLoader {
 
         rv
     }
-}
 
-impl LoadDeclarations for VcdLoader {
-    fn load_declarations(&self) -> Result<Vec<SignalDeclaration>> {
-        Ok(self.signals.clone())
-    }
-}
-
-impl LoadLength for VcdLoader {
-    fn load_length(&self) -> Result<usize> {
-        Ok(self.num_cycles)
-    }
-}
-
-impl LoadWaveform for VcdLoader {
     fn load_waveform(&self, name: impl AsRef<str>, cycles: Range<usize>) -> Result<Vec<Integer>> {
         let mut rv = Vec::with_capacity(cycles.len());
 
@@ -226,6 +218,7 @@ impl LoadWaveform for VcdLoader {
         }
     }
 }
+
 
 //
 // new style traits
