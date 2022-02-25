@@ -10,6 +10,7 @@ use ndarray::prelude::*;
 use rug::Assign;
 use std::collections::HashMap;
 use std::fs::File;
+use std::io::BufReader;
 use std::path::Path;
 
 struct SignalInfo {
@@ -34,7 +35,8 @@ pub struct VcdLoader {
 impl VcdLoader {
     pub fn new(filename: impl AsRef<Path>, cycle_time: Option<SimTime>) -> Result<Self> {
         let file = File::open(filename.as_ref())?;
-        let mut parser = Parser::new(file);
+        let reader = BufReader::new(file);
+        let mut parser = Parser::new(reader);
 
         let header = parser.parse_header()?;
         let timescale = header
