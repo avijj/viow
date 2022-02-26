@@ -247,11 +247,15 @@ impl QuerySource for VcdLoader {
         Ok(rv)
     }
 
-    fn query_time(&self) -> Result<SimTimeRange> {
+    fn query_time_range(&self) -> Result<SimTimeRange> {
         let start = SimTime::zero();
         let stop = self.cycle_time * (self.num_cycles as u64);
 
         Ok(SimTimeRange(start, stop))
+    }
+
+    fn query_time(&self, cycle: usize) -> SimTime {
+        self.cycle_time * (cycle as u64)
     }
 }
 
@@ -272,7 +276,7 @@ impl LookupId for VcdLoader {
         if *id < self.signals.len() {
             Ok(self.signals[*id].name.clone())
         } else {
-            Err(Error::IdOutOfRange(*id, self.signals.len() - 1))
+            Err(Error::IdOutOfRange(*id, 0..self.signals.len()))
         }
     }
 }

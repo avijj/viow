@@ -89,11 +89,18 @@ impl<SrcId, PipeId, PipeVal> QuerySource for Stage<SrcId, PipeId, PipeVal> {
         Ok(translated)
     }
 
-    fn query_time(&self) -> Result<SimTimeRange> {
+    fn query_time_range(&self) -> Result<SimTimeRange> {
         match self {
-            Self::Fil(ref prev, _) => prev.query_time(),
+            Self::Fil(ref prev, _) => prev.query_time_range(),
 
-            Self::Src(ref src) => src.query_time(),
+            Self::Src(ref src) => src.query_time_range(),
+        }
+    }
+
+    fn query_time(&self, cycle: usize) -> SimTime {
+        match self {
+            Self::Fil(ref prev, _) => prev.query_time(cycle),
+            Self::Src(ref src) => src.query_time(cycle),
         }
     }
 }

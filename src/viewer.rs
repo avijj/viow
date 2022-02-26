@@ -438,8 +438,13 @@ pub fn build_table<'a>(wave: &'a Wave, state: &State) -> ([Constraint; 3], Table
     let mut max_name_width = 0u16;
     let mut max_value_width = 0u16;
 
+    let wave_slice = wave.slice(top..bot, left..right)
+        .unwrap_or_default();
+
     for row_i in top..bot {
-        let fmt = build_waveform(wave.slice_of_signal(row_i, left, right), wave.formatter(row_i), state.zoom);
+        let signal_slice = wave_slice.signal_iter(row_i)
+            .unwrap();  // should not happen, due to for loop limits
+        let fmt = build_waveform(signal_slice, wave.formatter(row_i), state.zoom);
         let cur_cycle = (state.cur_wave_col - state.left_wave_col) * state.zoom;
         let s_pre: String = fmt.chars().take(cur_cycle).collect();
         let s_cur: String = fmt.chars().skip(cur_cycle).take(state.zoom).collect();

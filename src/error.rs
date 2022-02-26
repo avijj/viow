@@ -18,8 +18,11 @@ pub enum Error {
     #[error("Named signal '{0:}' not found")]
     NotFound(String),
 
-    #[error("ID {0:} is out of range 0 to {1:}")]
-    IdOutOfRange(usize, usize),
+    #[error("ID {0:} is out of range {} to {}", .1.start, .1.end)]
+    IdOutOfRange(usize, std::ops::Range<usize>),
+
+    #[error("Cycle {0:} is out of range 0 to {1:}")]
+    CycleOutOfRange(usize, usize),
 
     #[error("The given range {0:?} is invalid within limits of {1:?}.")]
     InvalidRange(Range<usize>, Range<usize>),

@@ -7,6 +7,14 @@ use ndarray::prelude::*;
 use ndarray;
 use rug::Integer;
 
+// TODO do not sample data on load or ever hold any data in Wave. Always defer to pipe to fetch
+// data:
+//  - replace slice_of_signal() with multi-id version, that samples the requested data from pipe,
+//  stores that in the iterator and returns to caller.
+//  - build_table() needs to request all rows in one go and iterate over them.
+//  - (opt) Add a LRU cache as pipeline stage on values using cycle and id as tag. Invalidate on
+//  reload. Limit in size.
+//  - VCD loader parses whole file, but only allocates data for requested range.
 pub struct Wave 
 {
     data: Array2<Integer>,
@@ -34,7 +42,7 @@ impl Wave {
             names.push(name);
             formatters.push(format);
         }
-        let times = pipe.query_time()?;
+        let times = pipe.query_time_range()?;
         let data = pipe.sample(&ids, &times)?;
 
         Ok(Self {
@@ -65,6 +73,20 @@ impl Wave {
             end: right,
             signal_index: i,
         }
+    }
+
+    /// Return an interval [left, right) of cycles from the wave
+    pub fn slice(&self, ids: std::ops::Range<usize>, cycles: std::ops::Range<usize>) -> Result<WaveSlice> {
+        let a = self.pipe.query_time(cycles.start);
+        let b = self.pipe.query_time(cycles.end);
+        let id_vec = ids.clone().collect();
+        let data = self.pipe.sample(&id_vec, &SimTimeRange(a, b))?;
+        
+        Ok(WaveSlice {
+            data,
+            cycles,
+            ids,
+        })
     }
 
     pub fn formatter(&self, signal_index: usize) -> WaveFormat {
@@ -153,8 +175,31 @@ impl Wave {
     }
 }
 
+/// Owns data of a collection of signals in an interval of cycles
+#[derive(Default)]
+pub struct WaveSlice {
+    data: Array2<Integer>,
+    cycles: std::ops::Range<usize>,
+    ids: std::ops::Range<usize>,
+}
 
+impl WaveSlice {
+    /// Return iterator over data of a single signal
+    pub fn signal_iter(&self, i: usize) -> Result<SliceIter> {
+        if !self.ids.contains(&i) {
+            Err(Error::IdOutOfRange(i, self.ids.clone()))
+        } else {
+            Ok(SliceIter {
+                data: &self.data,
+                ptr: 0,
+                end: self.cycles.len(),
+                signal_index: i - self.ids.start,
+            })
+        }
+    }
+}
 
+/// Iterator over data belonging to a single signal
 pub struct SliceIter<'a> {
     data: &'a Array2<Integer>,
     ptr: usize,
@@ -219,5 +264,30 @@ mod test {
         assert_eq!(Some(41), wave.next_transition(7, 1));
 
         assert_eq!(Some(0), wave.prev_transition(7, 40));
+    }
+
+    #[test]
+    fn test_wave_slice() {
+        let wave = make_test_wave()
+            .expect("Failed to load test wave data");
+
+        let wave_slice = wave.slice(7..8, 0..50).unwrap();
+        let data: Vec<_> = wave_slice.signal_iter(7)
+            .unwrap()
+            .collect();
+
+        assert_eq!(Integer::from(0), *data[0]);
+        assert_eq!(Integer::from(1), *data[1]);
+        assert_eq!(Integer::from(1), *data[40]);
+        assert_eq!(Integer::from(0), *data[41]);
+
+
+        let wave_slice = wave.slice(0..8, 39..53).unwrap();
+        let data: Vec<_> = wave_slice.signal_iter(7)
+            .unwrap()
+            .collect();
+
+        assert_eq!(Integer::from(1), *data[1]);
+        assert_eq!(Integer::from(0), *data[2]);
     }
 }

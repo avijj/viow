@@ -34,7 +34,9 @@ pub trait QuerySource {
     type IntoSignalIter: IntoIterator<Item = Signal<Self::Id>>;
 
     fn query_signals(&self) -> Result<Self::IntoSignalIter>;
-    fn query_time(&self) -> Result<SimTimeRange>;
+    fn query_time_range(&self) -> Result<SimTimeRange>;
+    fn query_time(&self, cycle: usize) -> SimTime;
+    //fn query_cycle(&self, time: SimTime) -> usize;
 }
 
 pub trait LookupId {

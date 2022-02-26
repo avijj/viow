@@ -21,11 +21,15 @@ impl QuerySource for EmptyLoader {
         Ok(vec![])
     }
 
-    fn query_time(&self) -> Result<SimTimeRange> {
+    fn query_time_range(&self) -> Result<SimTimeRange> {
         let start = SimTime::zero();
         let stop = SimTime::zero();
 
         Ok(SimTimeRange(start, stop))
+    }
+
+    fn query_time(&self, _cycle: usize) -> SimTime {
+        SimTime::zero()
     }
 }
 
@@ -38,7 +42,7 @@ impl LookupId for EmptyLoader {
     }
 
     fn rev_lookup_id(&self, id: &Self::ToId) -> Result<Self::FromId> {
-        Err(Error::IdOutOfRange(*id, 0))
+        Err(Error::IdOutOfRange(*id, 0..0))
     }
 }
 
