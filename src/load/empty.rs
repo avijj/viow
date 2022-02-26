@@ -31,6 +31,10 @@ impl QuerySource for EmptyLoader {
     fn query_time(&self, _cycle: usize) -> SimTime {
         SimTime::zero()
     }
+
+    fn query_cycle_count(&self) -> usize {
+        0
+    }
 }
 
 impl LookupId for EmptyLoader {

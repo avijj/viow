@@ -257,6 +257,10 @@ impl QuerySource for VcdLoader {
     fn query_time(&self, cycle: usize) -> SimTime {
         self.cycle_time * (cycle as u64)
     }
+
+    fn query_cycle_count(&self) -> usize {
+        self.num_cycles
+    }
 }
 
 impl LookupId for VcdLoader {

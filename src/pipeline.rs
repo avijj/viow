@@ -103,6 +103,13 @@ impl<SrcId, PipeId, PipeVal> QuerySource for Stage<SrcId, PipeId, PipeVal> {
             Self::Src(ref src) => src.query_time(cycle),
         }
     }
+
+    fn query_cycle_count(&self) -> usize {
+        match self {
+            Self::Fil(ref prev, _) => prev.query_cycle_count(),
+            Self::Src(ref src) => src.query_cycle_count(),
+        }
+    }
 }
 
 impl<SrcId, PipeId, PipeVal> Sample for Stage<SrcId, PipeId, PipeVal>

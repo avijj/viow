@@ -114,6 +114,20 @@ impl std::ops::Div<SimTime> for SimTime {
     }
 }
 
+//impl std::ops::Sub<SimTime> for SimTime {
+    //type Output = Self;
+
+    //fn sub(self, rhs: Self) -> Self::Output {
+        //let a = self.to_bigint();
+        //let b = rhs.to_bigint();
+        //let res = a - b;
+
+        //Self {
+            //value
+        //}
+    //}
+//}
+
 #[derive(Debug)]
 pub struct SimTimeRange(pub SimTime, pub SimTime);
 

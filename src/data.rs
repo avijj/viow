@@ -37,6 +37,14 @@ pub trait QuerySource {
     fn query_time_range(&self) -> Result<SimTimeRange>;
     fn query_time(&self, cycle: usize) -> SimTime;
     //fn query_cycle(&self, time: SimTime) -> usize;
+
+    fn query_cycle_count(&self) -> usize;
+    //{
+        //let time_range = self.query_time_range()?;
+        //let cycle_time = self.query_time(1);
+        //let duration = time_range.1 - time_range.0;
+        //Ok(duration / cycle_time)
+    //}
 }
 
 pub trait LookupId {

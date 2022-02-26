@@ -18,13 +18,14 @@ fn load_vcd_test() {
     assert_eq!(100, wave.num_cycles());
     assert_eq!(50, wave.num_signals());
     assert_eq!(Some("tb_core.mem.act_rd_q"), wave.name(11));
-    assert_eq!(Some(&Integer::from(1)), wave.value(11, 13));
-    assert_eq!(Some(&Integer::from(2)), wave.value(36, 37));
+    assert_eq!(Some(Integer::from(1)), wave.value(11, 13));
+    assert_eq!(Some(Integer::from(2)), wave.value(36, 37));
 
     {
         let one = Integer::from(1);
         let zero = Integer::from(0);
-        let clk_vals = wave.slice_of_signal(0, 0, wave.num_cycles());
+        let wave_slice = wave.slice(0..1, 0..wave.num_cycles()).unwrap();
+        let clk_vals = wave_slice.signal_iter(0).unwrap();
 
         for (cycle,val) in clk_vals.enumerate() {
             if cycle % 2 == 0 {
@@ -48,13 +49,14 @@ fn load_vcd_cycletime_test() {
     assert_eq!(200, wave.num_cycles());
     assert_eq!(50, wave.num_signals());
     assert_eq!(Some("tb_core.mem.act_rd_q"), wave.name(11));
-    assert_eq!(Some(&Integer::from(1)), wave.value(11, 13*2));
-    assert_eq!(Some(&Integer::from(2)), wave.value(36, 37*2));
+    assert_eq!(Some(Integer::from(1u32)), wave.value(11, 13*2));
+    assert_eq!(Some(Integer::from(2u32)), wave.value(36, 37*2));
 
     {
         let one = Integer::from(1);
         let zero = Integer::from(0);
-        let clk_vals = wave.slice_of_signal(0, 0, wave.num_cycles());
+        let wave_slice = wave.slice(0..1, 0..wave.num_cycles()).unwrap();
+        let clk_vals = wave_slice.signal_iter(0).unwrap();
 
         for (cycle,val) in clk_vals.enumerate() {
             if cycle % 4 < 2 {
