@@ -3,7 +3,6 @@ use crate::formatting::WaveFormat;
 use crate::error::*;
 
 use rug::Integer;
-use std::ops::Range;
 
 use ::vcd::{self, Header, Parser, ScopeItem, Value};
 use ndarray::prelude::*;
@@ -115,6 +114,8 @@ impl VcdLoader {
         (rv, sigmap, namemap)
     }
 
+    // used by load_all_waveforms
+    #[allow(dead_code)]
     fn map_values_to_int(target: &mut Integer, x: &Value) {
         match *x {
             Value::V1 => target.assign(1),
@@ -122,6 +123,8 @@ impl VcdLoader {
         }
     }
 
+    // used by load_all_waveforms
+    #[allow(dead_code)]
     fn map_vec_to_int(target: &mut Integer, x: &Vec<Value>) {
         target.assign(0);
         for (i, bit) in x.iter().enumerate() {
@@ -198,6 +201,8 @@ impl VcdLoader {
         cur_cycle
     }
 
+    // no longer used, but keeping it for now
+    #[allow(dead_code)]
     fn load_all_waveforms<T: std::io::Read>(
         parser: &mut Parser<T>,
         ids: &SignalMap,
