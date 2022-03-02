@@ -443,7 +443,7 @@ pub fn build_table<'a>(wave: &'a Wave, state: &State) -> ([Constraint; 3], Table
     let mut max_value_width = 0u16;
 
     let wave_slice = wave.slice(top..bot, left..right)
-        .unwrap_or_default();
+        .unwrap();   // Can't report error, because called from tui drawing closure.
 
     for row_i in top..bot {
         let signal_slice = wave_slice.signal_iter(row_i)

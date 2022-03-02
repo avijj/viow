@@ -14,7 +14,7 @@ use rug::Integer;
 //  - ✓ build_table() needs to request all rows in one go and iterate over them.
 //  - (opt) Add a LRU cache as pipeline stage on values using cycle and id as tag. Invalidate on
 //  reload. Limit in size.
-//  - VCD loader parses whole file, but only allocates data for requested range.
+//  - ✓ VCD loader parses whole file, but only allocates data for requested range.
 pub struct Wave 
 {
     formatters: Vec<WaveFormat>,
@@ -70,7 +70,7 @@ impl Wave {
         
         Ok(WaveSlice {
             data,
-            formatters: self.formatters.clone(),  // TODO use reference
+            formatters: &self.formatters,
             cycles,
             ids,
         })
@@ -157,15 +157,14 @@ impl Wave {
 }
 
 /// Owns data of a collection of signals in an interval of cycles
-#[derive(Default)]
-pub struct WaveSlice {
+pub struct WaveSlice<'a> {
     data: Array2<Integer>,
-    formatters: Vec<WaveFormat>,
+    formatters: &'a Vec<WaveFormat>,
     cycles: std::ops::Range<usize>,
     ids: std::ops::Range<usize>,
 }
 
-impl WaveSlice {
+impl<'a> WaveSlice<'a> {
     /// Return iterator over data of a single signal
     pub fn signal_iter(&self, i: usize) -> Result<SliceIter> {
         if !self.ids.contains(&i) {
