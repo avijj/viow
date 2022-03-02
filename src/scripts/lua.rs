@@ -78,7 +78,7 @@ impl View {
     fn new(state: &viewer::State) -> Self {
         Self {
             cursor_col: state.get_cur_wave_col(),
-            cursor_row: state.get_cur_wave_row(),
+            cursor_row: state.get_cursor_row(),
         }
     }
 

@@ -108,8 +108,12 @@ impl State {
         }
     }
 
-    pub fn get_cur_wave_row(&self) -> Option<usize> {
+    pub fn get_cursor_row(&self) -> Option<usize> {
         self.table_state.selected()
+    }
+
+    pub fn get_cur_wave_row(&self) -> usize {
+        self.cur_wave_row
     }
 
     pub fn set_cur_wave_row(&mut self, x: Option<usize>) {

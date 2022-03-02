@@ -196,7 +196,8 @@ fn event_step_normal(
 
             // next transition
             Event::Key(KeyEvent { code: KeyCode::Char('w'), .. }) => {
-                if let Some(cur_row) = state.ui.get_cur_wave_row() {
+                if state.ui.get_cursor_row().is_some() {
+                    let cur_row = state.ui.get_cur_wave_row();
                     if let Some(next) = state.wv.next_transition(cur_row, state.ui.get_cur_wave_col()) {
                         state.ui.set_cur_wave_col(next);
                     }
@@ -205,7 +206,8 @@ fn event_step_normal(
 
             // prev transition
             Event::Key(KeyEvent { code: KeyCode::Char('b'), .. }) => {
-                if let Some(cur_row) = state.ui.get_cur_wave_row() {
+                if state.ui.get_cursor_row().is_some() {
+                    let cur_row = state.ui.get_cur_wave_row();
                     if let Some(prev) = state.wv.prev_transition(cur_row, state.ui.get_cur_wave_col()) {
                         state.ui.set_cur_wave_col(prev);
                     }
@@ -249,7 +251,7 @@ fn event_step_normal(
                 state.wv.get_config_mut().enable_filter_list = true;
                 state.wv.reconfigure()?;
                 state.wv = state.wv.reload()?;
-                let insert_at = state.ui.get_cur_wave_row().unwrap_or(0);
+                let insert_at = state.ui.get_cursor_row().unwrap_or(0);
                 state
                     .ui
                     .start_insert_mode(unfiltered, state.wv.get_names().clone(), insert_at);
@@ -259,7 +261,7 @@ fn event_step_normal(
                 code: KeyCode::Char('t'),
                 ..
             }) => {
-                if let Some(cur_row) = state.ui.get_cur_wave_row() {
+                if let Some(cur_row) = state.ui.get_cursor_row() {
                     let cur_fmt = state.wv.formatter(cur_row);
                     let next_fmt = match cur_fmt {
                         WaveFormat::Vector(sz) => WaveFormat::BitVector(sz),
