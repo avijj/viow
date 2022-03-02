@@ -459,7 +459,7 @@ pub fn build_table<'a>(wave: &'a Wave, state: &State) -> ([Constraint; 3], Table
         let name_cell = Cell::from(name)
             .style(*cur_style);
 
-        let value_txt = wave.formatted_value(row_i, state.cur_wave_col)
+        let value_txt = wave_slice.formatted_value(row_i, state.cur_wave_col)
             .unwrap_or("⁇".to_string());
         if value_txt.len() as u16 > max_value_width {
             max_value_width = value_txt.len() as u16;

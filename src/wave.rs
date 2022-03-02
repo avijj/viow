@@ -70,6 +70,7 @@ impl Wave {
         
         Ok(WaveSlice {
             data,
+            formatters: self.formatters.clone(),  // TODO use reference
             cycles,
             ids,
         })
@@ -159,6 +160,7 @@ impl Wave {
 #[derive(Default)]
 pub struct WaveSlice {
     data: Array2<Integer>,
+    formatters: Vec<WaveFormat>,
     cycles: std::ops::Range<usize>,
     ids: std::ops::Range<usize>,
 }
@@ -180,6 +182,14 @@ impl WaveSlice {
 
     pub fn value(&self, signal_index: usize, cycle: usize) -> Option<&Integer> {
         self.data.get([cycle - self.cycles.start, signal_index - self.ids.start])
+    }
+
+    pub fn formatted_value(&self, signal_index: usize, cycle: usize) -> Option<String> {
+        self.value(signal_index, cycle)
+            .map(|val| {
+                let format = self.formatters[signal_index];
+                format_value(&val, format)
+            })
     }
 
     /// Find the next transition for a single signal
@@ -272,6 +282,9 @@ mod test {
     fn test_example_wave_data() {
         let wave = make_test_wave()
             .expect("Failed to load test wave data");
+
+        assert_eq!(16, wave.num_signals());
+        assert_eq!(211, wave.num_cycles());
 
         assert_eq!(Some(Integer::from(0)), wave.value(7, 0));
         assert_eq!(Some(Integer::from(1)), wave.value(7, 1));

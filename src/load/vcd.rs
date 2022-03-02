@@ -11,10 +11,16 @@ use rug::Assign;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::Path;
+use std::path::{Path,PathBuf};
 
 struct SignalInfo {
     index: usize,
+    size: u32,
+}
+
+struct Subset {
+    data: Array2<vcd::Value>,
+    bitmap: SignalBitMap,
 }
 
 #[derive(Clone)]
@@ -24,10 +30,12 @@ struct SignalDeclaration {
 }
 
 type SignalMap = HashMap<vcd::IdCode, SignalInfo>;
+type SignalBitMap = HashMap<vcd::IdCode, std::ops::Range<usize>>;
+type NameMap = HashMap<String, vcd::IdCode>;
 
 pub struct VcdLoader {
+    filename: PathBuf,
     signals: Vec<SignalDeclaration>,
-    data: Vec<Vec<Integer>>,
     num_cycles: usize,
     cycle_time: SimTime,
 }
@@ -43,33 +51,24 @@ impl VcdLoader {
             .timescale
             .map(|(n, ts)| Self::timescale_to_simtime(n, ts))
             .unwrap_or(SimTime::from_ps(1));
-        let (signals, ids) = Self::load_all_scopes(&header);
-        let (eff_cycle_time, data) = if let Some(cycle_time) = cycle_time {
-            (
-                cycle_time,
-                Self::load_all_waveforms(&mut parser, &ids, signals.len(), cycle_time, timescale),
-            )
-        } else {
-            (
-                timescale,
-                Self::load_all_waveforms(&mut parser, &ids, signals.len(), timescale, timescale),
-            )
-        };
+        let (signals, _ids, _) = Self::load_all_scopes(&header);
+        let cycle_time = cycle_time.unwrap_or(timescale);
 
-        let num_cycles = data.len();
+        let num_cycles = Self::load_count_cycles(&mut parser, cycle_time, timescale);
 
         Ok(Self {
+            filename: filename.as_ref().into(),
             signals,
-            data,
             num_cycles,
-            cycle_time: eff_cycle_time,
+            cycle_time,
         })
     }
 
-    fn load_all_scopes(header: &Header) -> (Vec<SignalDeclaration>, SignalMap) {
+    fn load_all_scopes(header: &Header) -> (Vec<SignalDeclaration>, SignalMap, NameMap) {
         let mut rv = vec![];
         let mut stack = vec![("".to_string(), &header.items)];
         let mut sigmap = SignalMap::new();
+        let mut namemap = NameMap::new();
 
         loop {
             if let Some((prefix, scope)) = stack.pop() {
@@ -83,10 +82,12 @@ impl VcdLoader {
                                 WaveFormat::Vector(var.size)
                             };
 
+                            namemap.insert(name.clone(), var.code);
                             rv.push(SignalDeclaration { name, format });
 
                             let info = SignalInfo {
                                 index: rv.len() - 1,
+                                size: var.size,
                             };
 
                             sigmap.insert(var.code, info);
@@ -98,12 +99,9 @@ impl VcdLoader {
                         }
 
                         ScopeItem::Comment(comment) => {
+                            let name = format!("-- {}: {}", prefix.strip_suffix(".").unwrap_or(""), comment);
                             rv.push(SignalDeclaration {
-                                name: format!(
-                                    "-- {}: {}",
-                                    prefix.strip_suffix(".").unwrap_or(""),
-                                    comment
-                                ),
+                                name,
                                 format: WaveFormat::Comment,
                             });
                         }
@@ -114,7 +112,7 @@ impl VcdLoader {
             }
         }
 
-        (rv, sigmap)
+        (rv, sigmap, namemap)
     }
 
     fn map_values_to_int(target: &mut Integer, x: &Value) {
@@ -136,6 +134,19 @@ impl VcdLoader {
         }
     }
 
+    fn map_array_to_int<'a>(target: &mut Integer, x: impl AsArray<'a, vcd::Value>) {
+        target.assign(0);
+        let ar = x.into();
+        for (i, bit) in ar.iter().enumerate() {
+            let val = match *bit {
+                Value::V1 => true,
+                _ => false,
+            };
+
+            target.set_bit((ar.len() - 1 - i) as u32, val);
+        }
+    }
+
     fn timescale_to_simtime(ts: u32, unit: vcd::TimescaleUnit) -> SimTime {
         use vcd::TimescaleUnit::*;
         let u = match unit {
@@ -148,6 +159,43 @@ impl VcdLoader {
         };
 
         SimTime::new(ts as u64, u)
+    }
+
+    fn load_count_cycles<T: std::io::Read>(
+        parser: &mut Parser<T>,
+        cycle_time: SimTime,
+        timescale: SimTime,
+    ) -> usize {
+        let mut cur_t = 0;
+        let mut cur_cycle = 0;
+        let mut cycle_time_ts: u64 = cycle_time / timescale;
+
+        for command in parser {
+            if command.is_err() {
+                continue;
+            }
+
+            let command = command.unwrap();
+
+            use vcd::Command::*;
+            match command {
+                Timescale(ts, unit) => {
+                    let timescale = Self::timescale_to_simtime(ts, unit);
+                    cycle_time_ts = cycle_time / timescale;
+                }
+
+                Timestamp(t) => {
+                    while (t - cur_t) >= cycle_time_ts {
+                        cur_t += cycle_time_ts;
+                        cur_cycle += 1;
+                    }
+                }
+
+                _ => (),
+            }
+        }
+
+        cur_cycle
     }
 
     fn load_all_waveforms<T: std::io::Read>(
@@ -203,24 +251,90 @@ impl VcdLoader {
         rv
     }
 
-    fn load_waveform(&self, name: impl AsRef<str>, cycles: Range<usize>) -> Result<Vec<Integer>> {
-        let mut rv = Vec::with_capacity(cycles.len());
+    fn assign_bit_positions(signals: &SignalMap, record_ids: &[vcd::IdCode]) -> Result<(SignalBitMap, usize)> {
+        let mut ptr = 0;
+        let mut rv = SignalBitMap::new();
 
-        let pos = self.signals.iter().position(|x| x.name == name.as_ref());
+        for id in record_ids.iter() {
+            let info = signals.get(id)
+                .ok_or(Error::Internal(format!("signal {} was not found in signal map", id)))?;
 
-        if let Some(pos) = pos {
-            if cycles.end > self.num_cycles {
-                Err(Error::InvalidRange(cycles, 0..self.num_cycles))
-            } else {
-                for cycle in cycles {
-                    rv.push(self.data[cycle][pos].clone());
+            rv.insert(*id, ptr..ptr + (info.size as usize));
+            ptr += info.size as usize;
+        }
+
+        Ok((rv, ptr))
+    }
+
+    fn load_subset<T: std::io::Read>(
+        parser: &mut Parser<T>,
+        ids: &SignalMap,
+        cycle_time: SimTime,
+        timescale: SimTime,
+        record_ids: &[vcd::IdCode],
+        record_cycles: std::ops::Range<u64>,
+    ) -> Result<Subset> {
+        // construct <cycles> x <signals> array for result data
+        let (bitmap, width) = Self::assign_bit_positions(ids, record_ids)?;
+        let height = (record_cycles.end - record_cycles.start) as usize;
+        let mut data = Array2::from_elem((height, width), vcd::Value::X);
+        let mut cur = Array1::from_elem(width, Value::X);
+        let mut cur_cycle: u64 = 0;
+        let mut cur_t = 0;
+        let mut cycle_time_ts: u64 = cycle_time / timescale;
+
+        'command_loop: for command in parser {
+            if command.is_err() {
+                continue;
+            }
+
+            let command = command.unwrap();
+
+            use vcd::Command::*;
+            match command {
+                Timescale(ts, unit) => {
+                    let timescale = Self::timescale_to_simtime(ts, unit);
+                    cycle_time_ts = cycle_time / timescale;
                 }
 
-                Ok(rv)
+                Timestamp(t) => {
+                    while (t - cur_t) >= cycle_time_ts {
+                        if record_cycles.contains(&cur_cycle) {
+                            let rel_cycle = (cur_cycle - record_cycles.start) as usize;
+                            data.slice_mut(s![rel_cycle, ..]).assign(&cur);
+                        } else if cur_cycle >= record_cycles.end {
+                            // early exit when all requested data is recorded
+                            break 'command_loop;
+                        }
+
+                        cur_t += cycle_time_ts;
+                        cur_cycle += 1;
+                    }
+                }
+
+                ChangeScalar(i, v) => {
+                    if let Some(bitrange) = bitmap.get(&i) {
+                        cur[[bitrange.start]] = v;
+                    }
+                }
+
+                ChangeVector(i, v) => {
+                    if let Some(bitrange) = bitmap.get(&i) {
+                        cur.slice_mut(s![bitrange.clone()])
+                            .assign(&Array1::from_vec(v));
+                    }
+                }
+
+                _ => (),
             }
-        } else {
-            Err(Error::NotFound(name.as_ref().to_string()))
         }
+
+        let rv = Subset {
+            data,
+            bitmap
+        };
+
+        Ok(rv)
     }
 }
 
@@ -294,13 +408,47 @@ impl Sample for VcdLoader {
         ids: &Vec<Self::Id>,
         times: &SimTimeRange,
     ) -> Result<CycleValues<Self::Value>> {
-        let start_cycle = (times.0 / self.cycle_time) as usize;
-        let stop_cycle = (times.1 / self.cycle_time) as usize;
+        let start_cycle = times.0 / self.cycle_time;
+        let stop_cycle = times.1 / self.cycle_time;
 
-        let mut data = Array2::default((stop_cycle - start_cycle, ids.len()));
-        for (i, id) in ids.iter().enumerate() {
-            let wv = self.load_waveform(id, start_cycle..stop_cycle)?;
-            data.slice_mut(s![.., i]).assign(&Array1::from_vec(wv));
+        // load data from file
+        let file = File::open(&self.filename)?;
+        let reader = BufReader::new(file);
+        let mut parser = Parser::new(reader);
+
+        let header = parser.parse_header()?;
+        let timescale = header
+            .timescale
+            .map(|(n, ts)| Self::timescale_to_simtime(n, ts))
+            .unwrap_or(SimTime::from_ps(1));
+        let (_signals, info, namemap) = Self::load_all_scopes(&header);
+
+        // translate to VCD Ids
+        let record_ids: Vec<vcd::IdCode> = ids.iter()
+            .filter_map(|id| {
+                namemap.get(id)
+            })
+            .map(|x| x.clone())
+            .collect();
+
+        // load subset
+        let subset = Self::load_subset(&mut parser, &info, self.cycle_time, timescale, &record_ids,
+            start_cycle..stop_cycle)?;
+
+        // convert to Integer
+        let num_cycles = (stop_cycle - start_cycle) as usize;
+        let num_signals = ids.len();
+        let mut data = Array2::default((num_cycles, num_signals));
+
+        for (row_i, mut row) in data.outer_iter_mut().enumerate() {
+            for (col_i, name) in ids.iter().enumerate() {
+                if let Some(idcode) = namemap.get(name) {
+                    let bitrange = subset.bitmap.get(idcode)
+                        .ok_or(Error::Internal(format!("Could not find bit position of VCD IdCode '{}'", idcode)))?;
+                    let bits = subset.data.slice(s![row_i, bitrange.clone()]);
+                    Self::map_array_to_int(&mut row[col_i], bits);
+                }
+            }
         }
 
         Ok(data)
@@ -308,3 +456,109 @@ impl Sample for VcdLoader {
 }
 
 impl Source<String, usize, Integer> for VcdLoader {}
+
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_load_subset() {
+        const FILENAME: &'static str = "examples/verilator.vcd";
+
+        let file = File::open(Path::new(FILENAME)).unwrap();
+        let reader = BufReader::new(file);
+        let mut parser = Parser::new(reader);
+
+        let header = parser.parse_header().unwrap();
+        let timescale = header
+            .timescale
+            .map(|(n, ts)| VcdLoader::timescale_to_simtime(n, ts))
+            .unwrap_or(SimTime::from_ps(1));
+        let (_signals, info, namemap) = VcdLoader::load_all_scopes(&header);
+
+        let ids = vec![
+            "top.clk".to_string(),
+            "top.hello.random".to_string()
+        ];
+        let record_ids: Vec<vcd::IdCode> = ids.iter()
+            .filter_map(|id| {
+                namemap.get(id)
+            })
+            .map(|x| x.clone())
+            .collect();
+        let record_cycles = 0..50;
+        let cycle_time = SimTime::from_ps(1);
+
+        let subset = VcdLoader::load_subset(&mut parser,&info, cycle_time, timescale, &record_ids,
+            record_cycles).unwrap();
+
+        println!("subset:\n{:?}", subset.data);
+
+        assert_eq!(Value::X, subset.data[[0, 0]]);
+        assert_eq!(Value::V1, subset.data[[1, 0]]);
+        assert_eq!(Value::V0, subset.data[[2, 0]]);
+        assert_eq!(Value::V1, subset.data[[3, 0]]);
+
+        assert_eq!(Value::X, subset.data[[0, 1]]);
+        for i in 1..40 {
+            assert_eq!(Value::V1, subset.data[[i, 1]]);
+        }
+        assert_eq!(Value::V0, subset.data[[41, 1]]);
+    }
+
+    #[test]
+    fn test_load_subset2() {
+        const FILENAME: &'static str = "examples/core.vcd";
+
+        let file = File::open(Path::new(FILENAME)).unwrap();
+        let reader = BufReader::new(file);
+        let mut parser = Parser::new(reader);
+
+        let header = parser.parse_header().unwrap();
+        let timescale = header
+            .timescale
+            .map(|(n, ts)| VcdLoader::timescale_to_simtime(n, ts))
+            .unwrap_or(SimTime::from_ps(1));
+        let (_signals, info, namemap) = VcdLoader::load_all_scopes(&header);
+
+        let ids = vec![
+            "tb_core.clk".to_string(),
+            "tb_core.reset".to_string(),
+            "tb_core.uut.ifu.i0_pass_q[0:1]".to_string(),
+        ];
+        let record_ids: Vec<vcd::IdCode> = ids.iter()
+            .filter_map(|id| {
+                namemap.get(id)
+            })
+            .map(|x| x.clone())
+            .collect();
+        let record_cycles = 0..100;
+        let cycle_time = SimTime::from_ps(100);
+
+        let subset = VcdLoader::load_subset(&mut parser,&info, cycle_time, timescale, &record_ids,
+            record_cycles).unwrap();
+
+        println!("subset:\n{:?}", subset.data);
+
+        assert_eq!(Value::V0, subset.data[[0, 0]]);
+        assert_eq!(Value::V1, subset.data[[1, 0]]);
+        assert_eq!(Value::V0, subset.data[[2, 0]]);
+        assert_eq!(Value::V1, subset.data[[3, 0]]);
+
+        for i in 0..9 {
+            assert_eq!(Value::V1, subset.data[[i, 1]]);
+        }
+        assert_eq!(Value::V0, subset.data[[10, 1]]);
+
+        assert_eq!(Value::X, subset.data[[0, 2]]);
+        assert_eq!(Value::X, subset.data[[0, 3]]);
+
+        assert_eq!(Value::V0, subset.data[[1, 2]]);
+        assert_eq!(Value::V0, subset.data[[1, 3]]);
+        
+        assert_eq!(Value::V1, subset.data[[11, 2]]);
+        assert_eq!(Value::V0, subset.data[[11, 3]]);
+    }
+}
