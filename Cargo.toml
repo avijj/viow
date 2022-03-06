@@ -17,6 +17,7 @@ anyhow = "1.0"
 clap = { version = "3.0", features = [ "derive" ] }
 mlua = { version = "0.7", features = [ "lua54", "vendored" ] }
 regex = "1"
+lru = "0.7"
 
 [dev-dependencies]
 tempdir = "0.3"

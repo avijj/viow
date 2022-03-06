@@ -417,7 +417,7 @@ impl State {
 }
 
 
-pub fn build_table<'a>(wave: &'a Wave, state: &State) -> ([Constraint; 3], Table<'a>) {
+pub fn build_table<'a>(wave: &'a mut Wave, state: &State) -> ([Constraint; 3], Table<'a>) {
     let even_style = Style::default()
         .fg(Color::Black)
         .bg(Color::White);
@@ -442,13 +442,13 @@ pub fn build_table<'a>(wave: &'a Wave, state: &State) -> ([Constraint; 3], Table
     let mut max_name_width = 0u16;
     let mut max_value_width = 0u16;
 
-    let wave_slice = wave.slice(top..bot, left..right)
+    let wave_slice = wave.cached_slice(top..bot, left..right)
         .unwrap();   // Can't report error, because called from tui drawing closure.
 
     for row_i in top..bot {
         let signal_slice = wave_slice.signal_iter(row_i)
             .unwrap();  // should not happen, due to for loop limits
-        let fmt = build_waveform(signal_slice, wave.formatter(row_i), state.zoom);
+        let fmt = build_waveform(signal_slice, wave_slice.formatter(row_i), state.zoom);
         let cur_cycle = (state.cur_wave_col - state.left_wave_col) * state.zoom;
         let s_pre: String = fmt.chars().take(cur_cycle).collect();
         let s_cur: String = fmt.chars().skip(cur_cycle).take(state.zoom).collect();
@@ -456,7 +456,7 @@ pub fn build_table<'a>(wave: &'a Wave, state: &State) -> ([Constraint; 3], Table
 
         let ref cur_style = if row_i % 2 == 0 { even_style } else { odd_style };
 
-        let name = wave.name(row_i).unwrap_or("⁇⁇⁇");
+        let name = wave_slice.name(row_i).unwrap_or("⁇⁇⁇");
         if name.len() as u16 > max_name_width {
             max_name_width = name.len() as u16;
         }

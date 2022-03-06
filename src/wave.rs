@@ -1,7 +1,11 @@
+mod cache;
+
+use cache::*;
 use crate::error::*;
 use crate::formatting::{WaveFormat,format_value};
 use crate::data::*;
 use crate::pipeline::*;
+use crate::config::Config;
 
 use ndarray::prelude::*;
 use ndarray;
@@ -12,7 +16,7 @@ use rug::Integer;
 //  - ✓ replace slice_of_signal() with multi-id version, that samples the requested data from pipe,
 //  stores that in the iterator and returns to caller.
 //  - ✓ build_table() needs to request all rows in one go and iterate over them.
-//  - (opt) Add a LRU cache as pipeline stage on values using cycle and id as tag. Invalidate on
+//  - ✓ (opt) Add a LRU cache as pipeline stage on values using cycle and id as tag. Invalidate on
 //  reload. Limit in size.
 //  - ✓ VCD loader parses whole file, but only allocates data for requested range.
 pub struct Wave 
@@ -22,10 +26,11 @@ pub struct Wave
     pipe: Pipeline,
     config: PipelineConfig,
     num_signals: usize,
+    cache: Cache,
 }
 
 impl Wave {
-    pub fn load(source: SrcBox) -> Result<Self> {
+    pub fn load(source: SrcBox/*, config: &Config*/) -> Result<Self> {
         let pipe = Pipeline::new(source);
         let config = PipelineConfig::default();
         Self::load_from_pipe(pipe, config)
@@ -44,12 +49,21 @@ impl Wave {
             formatters.push(format);
         }
 
+        let num_cycles = pipe.query_cycle_count();
+        // TODO use config object
+        let cache = Cache::new(128, 128, 1024, num_signals, num_cycles
+            //config.wave_cache_capacity(),
+            //config.wave_cache_signals_per_tile(),
+            //config.wave_cache_cycles_per_tile()
+        );
+
         Ok(Self {
             formatters,
             names,
             pipe,
             config,
             num_signals,
+            cache
         })
     }
 
@@ -70,9 +84,30 @@ impl Wave {
         
         Ok(WaveSlice {
             data,
+            names: &self.names,
             formatters: &self.formatters,
             cycles,
             ids,
+        })
+    }
+
+    /// Return a slice from the cache
+    ///
+    /// LRU cache over blocks of data, e.g. 128x1024. Use sample to get those individually.
+    /// Pick from cache and copy to WaveSlice.
+    pub fn cached_slice(&mut self, ids: std::ops::Range<usize>, cycles: std::ops::Range<usize>) -> Result<WaveSlice> {
+        let mut data = Array2::default((cycles.len(), ids.len()));
+
+        for (i,id) in ids.clone().enumerate() {
+            data.slice_mut(s![.., i]).assign(&self.cache.get(&self.pipe, id, cycles.clone()));
+        }
+
+        Ok(WaveSlice {
+            data,
+            names: &self.names,
+            formatters: &self.formatters,
+            cycles,
+            ids
         })
     }
 
@@ -138,8 +173,8 @@ impl Wave {
     ///
     /// Find the next cycle of the current signal's trace that is not equal to the value at
     /// `start_cycle`.
-    pub fn next_transition(&self, signal_index: usize, start_cycle: usize) -> Option<usize> {
-        let wave_slice = self.slice(signal_index..signal_index+1, start_cycle..self.num_cycles()).ok()?;
+    pub fn cached_next_transition(&mut self, signal_index: usize, start_cycle: usize) -> Option<usize> {
+        let wave_slice = self.cached_slice(signal_index..signal_index+1, start_cycle..self.num_cycles()).ok()?;
         wave_slice.next_transition(signal_index, start_cycle)
     }
 
@@ -150,8 +185,8 @@ impl Wave {
     ///
     /// Find the first preceding cycle of the current signal's trace that is not equal to the value
     /// at `start_cycle`.
-    pub fn prev_transition(&self, signal_index: usize, start_cycle: usize) -> Option<usize> {
-        let wave_slice = self.slice(signal_index..signal_index+1, 0..start_cycle+1).ok()?;
+    pub fn cached_prev_transition(&mut self, signal_index: usize, start_cycle: usize) -> Option<usize> {
+        let wave_slice = self.cached_slice(signal_index..signal_index+1, 0..start_cycle+1).ok()?;
         wave_slice.prev_transition(signal_index, start_cycle)
     }
 }
@@ -159,6 +194,7 @@ impl Wave {
 /// Owns data of a collection of signals in an interval of cycles
 pub struct WaveSlice<'a> {
     data: Array2<Integer>,
+    names: &'a Vec<String>,
     formatters: &'a Vec<WaveFormat>,
     cycles: std::ops::Range<usize>,
     ids: std::ops::Range<usize>,
@@ -177,6 +213,16 @@ impl<'a> WaveSlice<'a> {
                 signal_index: i - self.ids.start,
             })
         }
+    }
+
+    pub fn formatter(&self, signal_index: usize) -> WaveFormat {
+        self.formatters[signal_index]
+    }
+
+    pub fn name(&self, signal_index: usize) -> Option<&'a str> {
+        self.names
+            .get(signal_index)
+            .map(|s| s.as_str())
     }
 
     pub fn value(&self, signal_index: usize, cycle: usize) -> Option<&Integer> {
@@ -301,13 +347,13 @@ mod test {
 
     #[test]
     fn test_transitions() {
-        let wave = make_test_wave()
+        let mut wave = make_test_wave()
             .expect("Failed to load test wave data");
 
-        assert_eq!(Some(1), wave.next_transition(7, 0));
-        assert_eq!(Some(41), wave.next_transition(7, 1));
+        assert_eq!(Some(1), wave.cached_next_transition(7, 0));
+        assert_eq!(Some(41), wave.cached_next_transition(7, 1));
 
-        assert_eq!(Some(0), wave.prev_transition(7, 40));
+        assert_eq!(Some(0), wave.cached_prev_transition(7, 40));
     }
 
     #[test]

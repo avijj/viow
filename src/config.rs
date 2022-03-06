@@ -78,6 +78,18 @@ impl Config {
     pub fn get_config_dir(&self) -> Option<&PathBuf> {
         self.config_dir.as_ref()
     }
+
+    pub fn wave_cache_capacity(&self) -> usize {
+        8
+    }
+
+    pub fn wave_cache_signals_per_tile(&self) -> usize {
+        128
+    }
+
+    pub fn wave_cache_cycles_per_tile(&self) -> usize {
+        1024
+    }
 }
 
 

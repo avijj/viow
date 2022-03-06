@@ -198,7 +198,7 @@ fn event_step_normal(
             Event::Key(KeyEvent { code: KeyCode::Char('w'), .. }) => {
                 if state.ui.get_cursor_row().is_some() {
                     let cur_row = state.ui.get_cur_wave_row();
-                    if let Some(next) = state.wv.next_transition(cur_row, state.ui.get_cur_wave_col()) {
+                    if let Some(next) = state.wv.cached_next_transition(cur_row, state.ui.get_cur_wave_col()) {
                         state.ui.set_cur_wave_col(next);
                     }
                 }
@@ -208,7 +208,7 @@ fn event_step_normal(
             Event::Key(KeyEvent { code: KeyCode::Char('b'), .. }) => {
                 if state.ui.get_cursor_row().is_some() {
                     let cur_row = state.ui.get_cur_wave_row();
-                    if let Some(prev) = state.wv.prev_transition(cur_row, state.ui.get_cur_wave_col()) {
+                    if let Some(prev) = state.wv.cached_prev_transition(cur_row, state.ui.get_cur_wave_col()) {
                         state.ui.set_cur_wave_col(prev);
                     }
                 }
@@ -339,7 +339,7 @@ pub fn render_step(
         if state.ui.in_insert_mode() {
             render_insert(f, &stack[0], &mut state.ui);
         } else {
-            let (constraint, table) = build_table(&state.wv, &state.ui);
+            let (constraint, table) = build_table(&mut state.wv, &state.ui);
             let table = table.widths(&constraint);
             f.render_stateful_widget(table, size, state.ui.get_mut_table_state());
         }
@@ -368,7 +368,7 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
         let cycle_time = opts.cycle_step
             .map(|cs| SimTime::new(cs, timeunits));
         let loader = Box::new(VcdLoader::new(PathBuf::from(opts.input), cycle_time)?);
-        let wave = Wave::load(loader)?;
+        let wave = Wave::load(loader/*, &config*/)?;
 
         //let mut interpreter = LuaInterpreter::new(state, wave);
         let state = ScriptState {
@@ -381,7 +381,7 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
         Ok(step)
     } else if opts.input.ends_with(".lua") {
         let loader = Box::new(EmptyLoader::new());
-        let wave = Wave::load(loader)?;
+        let wave = Wave::load(loader/*, &config*/)?;
 
         let state = ScriptState {
             ui: State::new(),
