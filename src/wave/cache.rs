@@ -80,7 +80,7 @@ impl Cache {
 
     pub(super) fn get(&mut self, pipe: &Pipeline, id: usize, cycle_range: Range<usize>) -> Array1<Integer> {
         debug_assert!(id < self.num_signals);
-        debug_assert!(cycle_range.end < self.num_cycles);
+        debug_assert!(cycle_range.end <= self.num_cycles);
 
         let mut cur_cycle = cycle_range.start;
         let mut rv = Array1::default(cycle_range.end - cycle_range.start);

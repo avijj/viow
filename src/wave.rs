@@ -11,6 +11,8 @@ use ndarray::prelude::*;
 use ndarray;
 use rug::Integer;
 
+const SEARCH_HORIZON: usize = 1024;
+
 // TODO do not sample data on load or ever hold any data in Wave. Always defer to pipe to fetch
 // data:
 //  - ✓ replace slice_of_signal() with multi-id version, that samples the requested data from pipe,
@@ -173,9 +175,23 @@ impl Wave {
     ///
     /// Find the next cycle of the current signal's trace that is not equal to the value at
     /// `start_cycle`.
-    pub fn cached_next_transition(&mut self, signal_index: usize, start_cycle: usize) -> Option<usize> {
-        let wave_slice = self.cached_slice(signal_index..signal_index+1, start_cycle..self.num_cycles()).ok()?;
-        wave_slice.next_transition(signal_index, start_cycle)
+    pub fn cached_next_transition(&mut self, signal_index: usize, mut start_cycle: usize) -> Option<usize> {
+        let mut horizon = std::cmp::min(
+            start_cycle + SEARCH_HORIZON,
+            self.num_cycles()
+        );
+
+        while horizon <= self.num_cycles() {
+            let wave_slice = self.cached_slice(signal_index..signal_index+1, start_cycle..horizon).ok()?;
+            if let Some(found) = wave_slice.next_transition(signal_index, start_cycle) {
+                return Some(found);
+            }
+
+            start_cycle = horizon;
+            horizon += SEARCH_HORIZON;
+        }
+
+        None
     }
 
     /// Find the first previous transition for a single signal
@@ -185,9 +201,25 @@ impl Wave {
     ///
     /// Find the first preceding cycle of the current signal's trace that is not equal to the value
     /// at `start_cycle`.
-    pub fn cached_prev_transition(&mut self, signal_index: usize, start_cycle: usize) -> Option<usize> {
-        let wave_slice = self.cached_slice(signal_index..signal_index+1, 0..start_cycle+1).ok()?;
-        wave_slice.prev_transition(signal_index, start_cycle)
+    pub fn cached_prev_transition(&mut self, signal_index: usize, mut start_cycle: usize) -> Option<usize> {
+        let mut horizon = start_cycle.saturating_sub(SEARCH_HORIZON);
+
+        loop {
+            let wave_slice = self.cached_slice(signal_index..signal_index+1, horizon..start_cycle + 1).ok()?;
+            if let Some(found) = wave_slice.prev_transition(signal_index, start_cycle) {
+                return Some(found);
+            }
+
+            if horizon == 0 {
+                return None;
+            }
+
+            start_cycle = horizon;
+            horizon = horizon.saturating_sub(SEARCH_HORIZON);
+        }
+
+        //let wave_slice = self.cached_slice(signal_index..signal_index+1, 0..start_cycle+1).ok()?;
+        //wave_slice.prev_transition(signal_index, start_cycle)
     }
 }
 
