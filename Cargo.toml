@@ -18,6 +18,8 @@ clap = { version = "3.0", features = [ "derive" ] }
 mlua = { version = "0.7", features = [ "lua54", "vendored" ] }
 regex = "1"
 lru = "0.7"
+abi_stable = "0.10"
+viow-plugin-api = { path = "../avijj.viow-plugin-api" }
 
 [dev-dependencies]
 tempdir = "0.3"

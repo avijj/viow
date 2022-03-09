@@ -11,7 +11,7 @@ pub mod wave;
 use config::Config;
 use data::{SimTime, SimTimeUnit};
 use error::*;
-use load::{empty::EmptyLoader, vcd::VcdLoader};
+use load::{empty::EmptyLoader, vcd::VcdLoader, plugin::PluggedLoader};
 use scripts::{lua::LuaInterpreter, RunCommand, ScriptState};
 use viewer::*;
 use wave::Wave;
@@ -25,6 +25,11 @@ use std::rc::Rc;
 use tui::backend::CrosstermBackend;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::Terminal;
+use viow_plugin_api::{load_root_module_in_directory, FiletypeLoader_Ref};
+use std::collections::HashMap;
+
+
+type PluginMap = HashMap<String, FiletypeLoader_Ref>;
 
 pub struct Step {
     pub state: ScriptState,
@@ -358,7 +363,26 @@ pub fn render_step(
     })
 }
 
+fn load_plugins(opts: &Opts) -> Result<PluginMap> {
+    let mut rv = PluginMap::new();
+
+    for plugin_dir in opts.plugin.iter() {
+        let plugin = load_root_module_in_directory(plugin_dir)?;
+        let name = plugin.get_name()().to_string();
+        let load_plugin = plugin.get_loader()()
+            .into_option()
+            .ok_or(Error::Internal(format!("Plugin '{name}' is not a file loader")))?;
+        let suffix = load_plugin.get_suffix()().into_string();
+
+        rv.insert(suffix, load_plugin);
+    }
+
+    Ok(rv)
+}
+
 pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
+    let plugins = load_plugins(&opts)?;
+
     if opts.input.ends_with(".vcd") {
         //let cycle_step = opts.cycle_step.ok_or(Error::MissingArgument(
             //"--clock-period".into(),
@@ -392,6 +416,28 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
 
         let step = Step { state, interpreter, should_exit: false };
         Ok(step)
+    } else if !plugins.is_empty() {
+        let suffix = opts.input.split('.').last()
+            .ok_or(Error::UnknownFileFormat(opts.input.clone()))?;
+
+        if let Some(plugin) = plugins.get(suffix) {
+            let timeunits = SimTimeUnit::from_string(opts.timeunits.trim().to_lowercase())?;
+            let cycle_time = opts.cycle_step
+                .map(|cs| SimTime::new(cs, timeunits))
+                .ok_or(Error::MissingArgument("cycle_step".into(), "Needed for plugin load".into()))?;
+            let loader = Box::new(PluggedLoader::new(plugin.clone(), opts.input.as_str(), cycle_time)?);
+            let wave = Wave::load(loader/*, &config*/)?;
+
+            let state = ScriptState {
+                ui: State::new(),
+                wv: wave,
+            };
+            let interpreter = LuaInterpreter::new(&config)?;
+            let step = Step { state, interpreter, should_exit: false };
+            Ok(step)
+        } else {
+            Err(Error::UnknownFileFormat(opts.input.clone()))
+        }
     } else {
         Err(Error::UnknownFileFormat(opts.input.clone()))
     }
@@ -410,4 +456,8 @@ pub struct Opts {
     /// Timeunits to use to interpret times given in arguments
     #[clap(short, long, default_value = "ps")]
     timeunits: String,
+
+    /// Load plugin on startup
+    #[clap(long)]
+    plugin: Vec<std::path::PathBuf>,
 }

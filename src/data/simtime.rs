@@ -79,6 +79,11 @@ impl SimTime {
         Self::new(v, SimTimeUnit::Fs)
     }
 
+    pub fn as_ps(&self) -> Option<u64> {
+        let big = self.to_bigint() / SimTimeUnit::Ps.to_multiplier();
+        big.to_u64()
+    }
+
     pub fn get_value(&self) -> u64 {
         self.value
     }

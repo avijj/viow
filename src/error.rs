@@ -3,6 +3,9 @@ use std::sync::Arc;
 use mlua;
 use regex;
 use thiserror::Error;
+use viow_plugin_api::error::Error as PluginError;
+use abi_stable::library::LibraryError;
+
 
 #[derive(Error,Debug)]
 pub enum Error {
@@ -45,6 +48,11 @@ pub enum Error {
     #[error("Internal error: {0:}")]
     Internal(String),
 
+    #[error("Error when loading plugin library (abi_stable): {0:}")]
+    PluginLibrary(#[from] LibraryError),
+
+    #[error("Error in plugin: {0:}")]
+    Plugin(#[from] PluginError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
