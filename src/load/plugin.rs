@@ -4,6 +4,7 @@ use crate::formatting::*;
 use viow_plugin_api::{
     WaveLoadType,
     FiletypeLoader_Ref,
+    SignalSpec,
 };
 use abi_stable::std_types::*;
 use rug::{
@@ -15,7 +16,7 @@ use ndarray::prelude::*;
 pub struct PluggedLoader {
     plugin: FiletypeLoader_Ref,
     loader: WaveLoadType,
-    signals: Vec<String>,
+    signals: Vec<SignalSpec>,
     cycle_time: SimTime,
     num_cycles: usize,
 }
@@ -26,10 +27,13 @@ impl PluggedLoader {
             .ok_or(Error::Internal(format!("Cycle time {cycle_time:?} to large to represent in units of ps")))?;
         let mut loader = plugin.open()(&input.into(), cycle_time_ps).into_result()?;
 
-        let signals = loader.list_signal_names().into_result()?
-            .into_iter()
-            .map(|x| x.into_string())
-            .collect();
+        //let signals = loader.list_signal().into_result()?
+            //.into_iter()
+            //.map(|spec| x.into_string())
+            //.collect();
+        let signals = loader.list_signals()
+            .into_result()?
+            .into_vec();
 
         let num_cycles = loader.count_cycles().into_result()? as usize;
 
@@ -52,10 +56,10 @@ impl QuerySource for PluggedLoader {
         let rv: Self::IntoSignalIter = self
             .signals
             .iter()
-            .map(|txt| Signal {
-                id: txt.clone(),
-                name: txt.clone(),
-                format: WaveFormat::Bit   // TODO determine from plugin
+            .map(|spec| Signal {
+                id: spec.name.clone().into_string(),
+                name: spec.name.clone().into_string(),
+                format: WaveFormat::from(spec.typespec.clone()),
             })
             .collect();
 
@@ -83,7 +87,7 @@ impl LookupId for PluggedLoader {
     type ToId = usize;
 
     fn lookup_id(&self, id: &Self::FromId) -> Result<Self::ToId> {
-        let pos = self.signals.iter().position(|x| *x == *id);
+        let pos = self.signals.iter().position(|x| x.name == *id);
 
         match pos {
             Some(p) => Ok(p),
@@ -93,7 +97,8 @@ impl LookupId for PluggedLoader {
 
     fn rev_lookup_id(&self, id: &Self::ToId) -> Result<Self::FromId> {
         if *id < self.signals.len() {
-            Ok(self.signals[*id].clone())
+            let name = self.signals[*id].name.clone().into_string();
+            Ok(name)
         } else {
             Err(Error::IdOutOfRange(*id, 0..self.signals.len()))
         }
@@ -122,13 +127,13 @@ impl Sample for PluggedLoader {
         // convert to Integer
         let num_cycles = (stop_cycle - start_cycle) as usize;
         let num_signals = ids.len();
-        let mut data = Array2::default((num_cycles, num_signals));
+        let mut data: Array2<Integer> = Array2::default((num_cycles, num_signals));
 
         for (row_i, mut row) in data.outer_iter_mut().enumerate() {
             for (col_i, _) in ids.iter().enumerate() {
                 let bits = self.loader.extract(&subset, col_i as u64, row_i as u64)
                     .into_vec();
-                row[[col_i]] = Integer::from_digits(&bits, Order::Msf);
+                row[[col_i]].assign_digits(&bits, Order::Msf);
             }
         }
 

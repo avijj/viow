@@ -1,4 +1,6 @@
 use rug::Integer;
+use viow_plugin_api::SignalType;
+use std::convert::From;
 
 #[derive(Clone,Copy,PartialEq)]
 pub enum WaveFormat {
@@ -6,6 +8,17 @@ pub enum WaveFormat {
     Vector(u32),
     BitVector(u32),
     Comment,
+}
+
+impl From<SignalType> for WaveFormat {
+    fn from(t: SignalType) -> Self {
+        use SignalType::*;
+
+        match t {
+            Bit => WaveFormat::Bit,
+            Vector(a, b) => WaveFormat::Vector((a - b).abs() as u32),
+        }
+    }
 }
 
 fn build_waveform_vec<'a, T>(line_data: T, zoom: usize) -> String 
