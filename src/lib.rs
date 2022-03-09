@@ -333,10 +333,11 @@ pub fn render_step(
             ])
             .split(size);
 
-        state.ui.resize(
-            stack[0].width.saturating_sub(48),
-            stack[0].height.saturating_sub(2),
-        );
+        //state.ui.resize(
+            //stack[0].width.saturating_sub(48),
+            //stack[0].height.saturating_sub(2),
+        //);
+        state.ui.resize(stack[0].width, stack[0].height.saturating_sub(2));
         state
             .ui
             .data_size(state.wv.num_signals(), state.wv.num_cycles());
@@ -345,6 +346,12 @@ pub fn render_step(
             render_insert(f, &stack[0], &mut state.ui);
         } else {
             let (constraint, table) = build_table(&mut state.wv, &state.ui);
+            if let [ Constraint::Min(ref max_name_width),
+                    Constraint::Length(ref max_value_width),
+                    Constraint::Ratio(1, 1) ] = constraint {
+                state.ui.resize(stack[0].width.saturating_sub(max_name_width + max_value_width + 2),
+                    stack[0].height.saturating_sub(2));
+            }
             let table = table.widths(&constraint);
             f.render_stateful_widget(table, size, state.ui.get_mut_table_state());
         }
