@@ -53,7 +53,7 @@ impl Cache {
         }
     }
 
-    fn load_tile(&self, pipe: &Pipeline, index: &CacheIndex) -> CacheTile {
+    fn load_tile(&self, pipe: &mut Pipeline, index: &CacheIndex) -> CacheTile {
         let start_cycle = index.y * self.cycles_per_tile;
         let end_cycle = std::cmp::min(
             (index.y + 1) * self.cycles_per_tile,
@@ -78,7 +78,7 @@ impl Cache {
         }
     }
 
-    pub(super) fn get(&mut self, pipe: &Pipeline, id: usize, cycle_range: Range<usize>) -> Array1<Integer> {
+    pub(super) fn get(&mut self, pipe: &mut Pipeline, id: usize, cycle_range: Range<usize>) -> Array1<Integer> {
         debug_assert!(id < self.num_signals);
         debug_assert!(cycle_range.end <= self.num_cycles);
 
@@ -152,12 +152,12 @@ mod test {
         const CYC_PER_TILE: usize = 23;
 
         let loader = Box::new(VcdLoader::new("examples/verilator.vcd", Some(SimTime::from_ps(1))).unwrap());
-        let pipe = Pipeline::new(loader);
+        let mut pipe = Pipeline::new(loader);
         let num_signals = pipe.query_signals().unwrap().len();
         let num_cycles = pipe.query_cycle_count();
         let mut cache = Cache::new(CAPACITY, SIG_PER_TILE, CYC_PER_TILE, num_signals, num_cycles);
 
-        let needle = cache.get(&pipe, 7, 0..50);
+        let needle = cache.get(&mut pipe, 7, 0..50);
 
         assert_eq!(Integer::from(0), needle[0]);
         for i in 1..40 {
@@ -165,20 +165,20 @@ mod test {
         }
         assert_eq!(Integer::from(0), needle[41]);
 
-        assert_eq!(Integer::from(2), cache.get(&pipe, 5, 0..20)[13]);
-        assert_eq!(Integer::from(3), cache.get(&pipe, 5, 0..16)[15]);
-        assert_eq!(Integer::from(7), cache.get(&pipe, 5, 0..24)[23]);
-        assert_eq!(Integer::from(7), cache.get(&pipe, 5, 10..24)[13]);
-        assert_eq!(Integer::from(7), cache.get(&pipe, 5, 23..24)[0]);
+        assert_eq!(Integer::from(2), cache.get(&mut pipe, 5, 0..20)[13]);
+        assert_eq!(Integer::from(3), cache.get(&mut pipe, 5, 0..16)[15]);
+        assert_eq!(Integer::from(7), cache.get(&mut pipe, 5, 0..24)[23]);
+        assert_eq!(Integer::from(7), cache.get(&mut pipe, 5, 10..24)[13]);
+        assert_eq!(Integer::from(7), cache.get(&mut pipe, 5, 23..24)[0]);
 
         for i in 0..15 {
-            cache.get(&pipe, i, 0..200);
+            cache.get(&mut pipe, i, 0..200);
         }
 
-        assert_eq!(Integer::from(2), cache.get(&pipe, 5, 0..20)[13]);
-        assert_eq!(Integer::from(3), cache.get(&pipe, 5, 0..16)[15]);
-        assert_eq!(Integer::from(7), cache.get(&pipe, 5, 0..24)[23]);
-        assert_eq!(Integer::from(7), cache.get(&pipe, 5, 10..24)[13]);
-        assert_eq!(Integer::from(7), cache.get(&pipe, 5, 23..24)[0]);
+        assert_eq!(Integer::from(2), cache.get(&mut pipe, 5, 0..20)[13]);
+        assert_eq!(Integer::from(3), cache.get(&mut pipe, 5, 0..16)[15]);
+        assert_eq!(Integer::from(7), cache.get(&mut pipe, 5, 0..24)[23]);
+        assert_eq!(Integer::from(7), cache.get(&mut pipe, 5, 10..24)[13]);
+        assert_eq!(Integer::from(7), cache.get(&mut pipe, 5, 23..24)[0]);
     }
 }

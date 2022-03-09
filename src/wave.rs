@@ -13,7 +13,7 @@ use rug::Integer;
 
 const SEARCH_HORIZON: usize = 1024;
 
-// TODO do not sample data on load or ever hold any data in Wave. Always defer to pipe to fetch
+// Do not sample data on load or ever hold any data in Wave. Always defer to pipe to fetch
 // data:
 //  - ✓ replace slice_of_signal() with multi-id version, that samples the requested data from pipe,
 //  stores that in the iterator and returns to caller.
@@ -78,20 +78,20 @@ impl Wave {
     }
 
     /// Return an interval [left, right) of cycles from the wave
-    pub fn slice(&self, ids: std::ops::Range<usize>, cycles: std::ops::Range<usize>) -> Result<WaveSlice> {
-        let a = self.pipe.query_time(cycles.start);
-        let b = self.pipe.query_time(cycles.end);
-        let id_vec = ids.clone().collect();
-        let data = self.pipe.sample(&id_vec, &SimTimeRange(a, b))?;
+    //pub fn slice(&self, ids: std::ops::Range<usize>, cycles: std::ops::Range<usize>) -> Result<WaveSlice> {
+        //let a = self.pipe.query_time(cycles.start);
+        //let b = self.pipe.query_time(cycles.end);
+        //let id_vec = ids.clone().collect();
+        //let data = self.pipe.sample(&id_vec, &SimTimeRange(a, b))?;
         
-        Ok(WaveSlice {
-            data,
-            names: &self.names,
-            formatters: &self.formatters,
-            cycles,
-            ids,
-        })
-    }
+        //Ok(WaveSlice {
+            //data,
+            //names: &self.names,
+            //formatters: &self.formatters,
+            //cycles,
+            //ids,
+        //})
+    //}
 
     /// Return a slice from the cache
     ///
@@ -101,7 +101,7 @@ impl Wave {
         let mut data = Array2::default((cycles.len(), ids.len()));
 
         for (i,id) in ids.clone().enumerate() {
-            data.slice_mut(s![.., i]).assign(&self.cache.get(&self.pipe, id, cycles.clone()));
+            data.slice_mut(s![.., i]).assign(&self.cache.get(&mut self.pipe, id, cycles.clone()));
         }
 
         Ok(WaveSlice {
@@ -121,13 +121,13 @@ impl Wave {
         self.formatters[signal_index] = format;
     }
 
-    pub fn value(&self, signal_index: usize, cycle: usize) -> Option<Integer> {
-        let wave_slice = self.slice(signal_index..signal_index+1, cycle..cycle+1).ok()?;
+    pub fn value(&mut self, signal_index: usize, cycle: usize) -> Option<Integer> {
+        let wave_slice = self.cached_slice(signal_index..signal_index+1, cycle..cycle+1).ok()?;
         wave_slice.value(signal_index, cycle)
             .map(|x| x.clone())
     }
 
-    pub fn formatted_value(&self, signal_index: usize, cycle: usize) -> Option<String> {
+    pub fn formatted_value(&mut self, signal_index: usize, cycle: usize) -> Option<String> {
         self.value(signal_index, cycle)
             .map(|val| {
                 let format = self.formatters[signal_index];
@@ -357,7 +357,7 @@ mod test {
 
     #[test]
     fn test_example_wave_data() {
-        let wave = make_test_wave()
+        let mut wave = make_test_wave()
             .expect("Failed to load test wave data");
 
         assert_eq!(16, wave.num_signals());
@@ -368,7 +368,7 @@ mod test {
         assert_eq!(Some(Integer::from(1)), wave.value(7, 40));
         assert_eq!(Some(Integer::from(0)), wave.value(7, 41));
 
-        let wave_slice = wave.slice(0..wave.num_signals(), 0..wave.num_cycles()).unwrap();
+        let wave_slice = wave.cached_slice(0..wave.num_signals(), 0..wave.num_cycles()).unwrap();
         let col = wave_slice.data.column(7);
 
         assert_eq!(Integer::from(0), col[0]);
@@ -390,10 +390,10 @@ mod test {
 
     #[test]
     fn test_wave_slice() {
-        let wave = make_test_wave()
+        let mut wave = make_test_wave()
             .expect("Failed to load test wave data");
 
-        let wave_slice = wave.slice(7..8, 0..50).unwrap();
+        let wave_slice = wave.cached_slice(7..8, 0..50).unwrap();
         let data: Vec<_> = wave_slice.signal_iter(7)
             .unwrap()
             .collect();
@@ -404,7 +404,7 @@ mod test {
         assert_eq!(Integer::from(0), *data[41]);
 
 
-        let wave_slice = wave.slice(0..8, 39..53).unwrap();
+        let wave_slice = wave.cached_slice(0..8, 39..53).unwrap();
         let data: Vec<_> = wave_slice.signal_iter(7)
             .unwrap()
             .collect();

@@ -120,12 +120,12 @@ where
     type Value = PipeVal;
 
     fn sample(
-        &self,
+        &mut self,
         ids: &Vec<Self::Id>,
         times: &SimTimeRange,
     ) -> Result<CycleValues<Self::Value>> {
         match self {
-            Self::Fil(ref prev, ref filter) => {
+            Self::Fil(ref mut prev, ref filter) => {
                 let trans_ids = filter.rev_translate_ids(ids.to_vec())?;
                 let mut vals = prev.sample(&trans_ids, times)?;
                 for elem in vals.iter_mut() {
@@ -135,7 +135,7 @@ where
                 Ok(vals)
             }
 
-            Self::Src(ref src) => {
+            Self::Src(ref mut src) => {
                 let src_ids: Result<Vec<_>> = ids.iter().map(|id| src.rev_lookup_id(id)).collect();
                 let src_ids = src_ids?;
                 let src_vals = src.sample(&src_ids, times)?;

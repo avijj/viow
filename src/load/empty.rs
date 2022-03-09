@@ -54,7 +54,7 @@ impl Sample for EmptyLoader {
     type Id = String;
     type Value = Integer;
 
-    fn sample(&self, _ids: &Vec<Self::Id>, _times: &SimTimeRange) -> Result<CycleValues<Self::Value>> {
+    fn sample(&mut self, _ids: &Vec<Self::Id>, _times: &SimTimeRange) -> Result<CycleValues<Self::Value>> {
         let data = Array2::default((0, 0));
         Ok(data)
     }

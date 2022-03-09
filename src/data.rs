@@ -60,7 +60,7 @@ pub trait Sample {
     type Value;
 
     // Need concrete types as arguments, because of use as trait object.
-    fn sample(&self, ids: &Vec<Self::Id>, times: &SimTimeRange)
+    fn sample(&mut self, ids: &Vec<Self::Id>, times: &SimTimeRange)
         -> Result<CycleValues<Self::Value>>;
 }
 

@@ -409,7 +409,7 @@ impl Sample for VcdLoader {
     type Value = Integer;
 
     fn sample(
-        &self,
+        &mut self,
         ids: &Vec<Self::Id>,
         times: &SimTimeRange,
     ) -> Result<CycleValues<Self::Value>> {

@@ -105,7 +105,7 @@ impl Sample for PluggedLoader {
     type Value = Integer;
 
     fn sample(
-        &self,
+        &mut self,
         ids: &Vec<Self::Id>,
         times: &SimTimeRange,
     ) -> Result<CycleValues<Self::Value>> {

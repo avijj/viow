@@ -13,7 +13,7 @@ fn load_vcd_test() {
     const CYCLE_TIME: SimTime = SimTime::new(100, SimTimeUnit::Ps);
 
     let loader = Box::new(VcdLoader::new(PathBuf::from(FILE_NAME), Some(CYCLE_TIME)).unwrap());
-    let wave = Wave::load(loader).unwrap();
+    let mut wave = Wave::load(loader).unwrap();
 
     assert_eq!(100, wave.num_cycles());
     assert_eq!(50, wave.num_signals());
@@ -24,7 +24,7 @@ fn load_vcd_test() {
     {
         let one = Integer::from(1);
         let zero = Integer::from(0);
-        let wave_slice = wave.slice(0..1, 0..wave.num_cycles()).unwrap();
+        let wave_slice = wave.cached_slice(0..1, 0..wave.num_cycles()).unwrap();
         let clk_vals = wave_slice.signal_iter(0).unwrap();
 
         for (cycle,val) in clk_vals.enumerate() {
@@ -44,7 +44,7 @@ fn load_vcd_cycletime_test() {
     const CYCLE_TIME: SimTime = SimTime::new(50, SimTimeUnit::Ps);
 
     let loader = Box::new(VcdLoader::new(PathBuf::from(FILE_NAME), Some(CYCLE_TIME)).unwrap());
-    let wave = Wave::load(loader).unwrap();
+    let mut wave = Wave::load(loader).unwrap();
 
     assert_eq!(200, wave.num_cycles());
     assert_eq!(50, wave.num_signals());
@@ -55,7 +55,7 @@ fn load_vcd_cycletime_test() {
     {
         let one = Integer::from(1);
         let zero = Integer::from(0);
-        let wave_slice = wave.slice(0..1, 0..wave.num_cycles()).unwrap();
+        let wave_slice = wave.cached_slice(0..1, 0..wave.num_cycles()).unwrap();
         let clk_vals = wave_slice.signal_iter(0).unwrap();
 
         for (cycle,val) in clk_vals.enumerate() {
