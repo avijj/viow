@@ -983,6 +983,7 @@ dependencies = [
 [[package]]
 name = "viow-plugin-api"
 version = "0.1.0"
+source = "git+https://github.com/avijj/viow-plugin-api#26b107a3a4e92c62839c7f7d13de1b3ec361a23f"
 dependencies = [
  "abi_stable",
  "thiserror",
