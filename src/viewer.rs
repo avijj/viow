@@ -417,7 +417,7 @@ impl State {
 }
 
 
-pub fn build_table<'a>(wave: &'a mut Wave, state: &State) -> ([Constraint; 3], Table<'a>) {
+pub fn build_table<'a>(wave: &'a mut Wave, state: &State) -> (u16, u16, Table<'a>) {
     let even_style = Style::default()
         .fg(Color::Black)
         .bg(Color::White);
@@ -481,16 +481,11 @@ pub fn build_table<'a>(wave: &'a mut Wave, state: &State) -> ([Constraint; 3], T
         rows.push(Row::new(vec![name_cell, value_cell, wave_cell]));
     }
 
-    let constraint = [
-        Constraint::Min(max_name_width),
-        Constraint::Length(max_value_width),
-        Constraint::Ratio(1, 1)
-    ];
-
     // This is necessary due to tui's API. We need to pass constraint as reference. We can't pass a
     // reference to function owned variable.
     (
-        constraint,
+        max_name_width,
+        max_value_width,
         Table::new(rows)
             .header(Row::new(vec!["Name", "Value", "Waveform"])
                 .style(Style::default().fg(Color::Yellow))

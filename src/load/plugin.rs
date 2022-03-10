@@ -31,7 +31,7 @@ impl PluggedLoader {
             //.into_iter()
             //.map(|spec| x.into_string())
             //.collect();
-        let signals = loader.list_signals()
+        let signals = loader.init_signals()
             .into_result()?
             .into_vec();
 
@@ -131,8 +131,7 @@ impl Sample for PluggedLoader {
 
         for (row_i, mut row) in data.outer_iter_mut().enumerate() {
             for (col_i, _) in ids.iter().enumerate() {
-                let bits = self.loader.extract(&subset, col_i as u64, row_i as u64)
-                    .into_vec();
+                let bits = subset.get(col_i as u64, row_i as u64);
                 row[[col_i]].assign_digits(&bits, Order::Msf);
             }
         }
