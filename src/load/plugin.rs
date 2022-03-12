@@ -12,11 +12,13 @@ use rug::{
     integer::Order
 };
 use ndarray::prelude::*;
+use std::collections::HashMap;
 
 pub struct PluggedLoader {
     plugin: FiletypeLoader_Ref,
     loader: WaveLoadType,
     signals: Vec<SignalSpec>,
+    signal_names: HashMap<String, usize>,
     cycle_time: SimTime,
     num_cycles: usize,
 }
@@ -34,6 +36,10 @@ impl PluggedLoader {
         let signals = loader.init_signals()
             .into_result()?
             .into_vec();
+        let mut signal_names = HashMap::with_capacity(signals.len());
+        for (i, sig) in signals.iter().enumerate() {
+            signal_names.insert(sig.name.to_string(), i);
+        }
 
         let num_cycles = loader.count_cycles().into_result()? as usize;
 
@@ -41,6 +47,7 @@ impl PluggedLoader {
             plugin,
             loader,
             signals,
+            signal_names,
             cycle_time,
             num_cycles,
         })
@@ -57,8 +64,8 @@ impl QuerySource for PluggedLoader {
             .signals
             .iter()
             .map(|spec| Signal {
-                id: spec.name.clone().into_string(),
-                name: spec.name.clone().into_string(),
+                id: spec.name.to_string(),
+                name: spec.name.to_string(),
                 format: WaveFormat::from(spec.typespec.clone()),
             })
             .collect();
@@ -87,17 +94,20 @@ impl LookupId for PluggedLoader {
     type ToId = usize;
 
     fn lookup_id(&self, id: &Self::FromId) -> Result<Self::ToId> {
-        let pos = self.signals.iter().position(|x| x.name == *id);
+        let pos = self.signal_names.get(id);
 
         match pos {
-            Some(p) => Ok(p),
+            Some(&p) => {
+                debug_assert!(self.signals[p].name == *id, "Signal data is not self-consistent");
+                Ok(p)
+            }
             None => Err(Error::NotFound(id.clone())),
         }
     }
 
     fn rev_lookup_id(&self, id: &Self::ToId) -> Result<Self::FromId> {
         if *id < self.signals.len() {
-            let name = self.signals[*id].name.clone().into_string();
+            let name = self.signals[*id].name.to_string();
             Ok(name)
         } else {
             Err(Error::IdOutOfRange(*id, 0..self.signals.len()))
