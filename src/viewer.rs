@@ -9,6 +9,9 @@ use tui::layout::{Direction, Layout, Rect, Constraint};
 use tui::style::{Style, Color, Modifier};
 use tui::text::{Text, Spans, Span};
 
+const MAX_NAME_COL_WIDTH: u16 = 100;
+const MAX_VALUE_COL_WIDTH: u16 = 40;
+
 pub struct InsertState {
     prompt: String,
     list: Vec<String>,
@@ -480,6 +483,10 @@ pub fn build_table<'a>(wave: &'a mut Wave, state: &State) -> (u16, u16, Table<'a
 
         rows.push(Row::new(vec![name_cell, value_cell, wave_cell]));
     }
+
+    // upper bound for column width
+    max_name_width = std::cmp::min(max_name_width, MAX_NAME_COL_WIDTH);
+    max_value_width = std::cmp::min(max_value_width, MAX_VALUE_COL_WIDTH);
 
     // This is necessary due to tui's API. We need to pass constraint as reference. We can't pass a
     // reference to function owned variable.
