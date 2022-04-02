@@ -20,6 +20,8 @@ use formatting::WaveFormat;
 //use anyhow::Result;
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
+use crossterm::terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::ExecutableCommand;
 use std::path::PathBuf;
 use std::rc::Rc;
 use tui::backend::CrosstermBackend;
@@ -35,13 +37,14 @@ pub struct Step {
     pub state: ScriptState,
     pub interpreter: LuaInterpreter,
     pub should_exit: bool,
+    pub should_clear: bool,
 }
 
 fn event_step_insert(
     ev: Event,
     step: Step,
 ) -> Result<Step> {
-    let Step { mut state, interpreter, should_exit } = step;
+    let Step { mut state, interpreter, should_exit, .. } = step;
 
     match ev {
         Event::Key(KeyEvent {
@@ -90,14 +93,14 @@ fn event_step_insert(
         _ => {}
     }
 
-    Ok(Step { state, interpreter, should_exit })
+    Ok(Step { state, interpreter, should_exit, should_clear: false })
 }
 
 fn event_step_normal(
     ev: Event,
     step: Step
 ) -> Result<Step> {
-    let Step { mut state, mut interpreter, mut should_exit } = step;
+    let Step { mut state, mut interpreter, mut should_exit, mut should_clear } = step;
 
     if state.ui.in_command() {
         match ev {
@@ -112,8 +115,33 @@ fn event_step_normal(
                 code: KeyCode::Enter,
                 ..
             }) => {
+                let mut stdout = std::io::stdout();
                 let cmd = state.ui.pop_command().ok_or(Error::NoCommand)?;
-                state = interpreter.run_command(state, cmd)?;
+
+                disable_raw_mode()?;
+                stdout.execute(LeaveAlternateScreen)?;
+
+                let res = interpreter.run_command(state, cmd);
+                match res {
+                    Ok(new_state) => {
+                        if let Some(ref script_error) = new_state.er {
+                            println!("Error: {}", script_error);
+                            println!("*** Press enter to continue ***");
+                            crossterm::event::read()?;
+                        }
+
+                        state = new_state
+                    }
+
+                    Err(err) => {
+                        return Err(err);
+                    }
+                };
+
+                stdout.execute(EnterAlternateScreen)?;
+                enable_raw_mode()?;
+
+                should_clear = true;
             }
 
             Event::Key(KeyEvent {
@@ -262,6 +290,7 @@ fn event_step_normal(
                     .start_insert_mode(unfiltered, state.wv.get_names().clone(), insert_at);
             }
 
+            // toggle type
             Event::Key(KeyEvent {
                 code: KeyCode::Char('t'),
                 ..
@@ -279,11 +308,12 @@ fn event_step_normal(
                 }
             }
 
+
             _ => {}
         }
     }
 
-    Ok(Step { state, interpreter, should_exit })
+    Ok(Step { state, interpreter, should_exit, should_clear })
 }
 
 pub fn event_step(step: Step, ev: Event) -> Result<Step> {
@@ -310,6 +340,10 @@ pub fn main_loop(stdout: std::io::Stdout, opts: Opts, config: Rc<Config>) -> Res
         if step.should_exit {
             break;
         }
+
+        if step.should_clear {
+            terminal.clear()?;
+        }
     }
 
     Ok(())
@@ -319,7 +353,7 @@ pub fn render_step(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     step: Step,
 ) -> Result<Step> {
-    let Step { mut state, interpreter, should_exit } = step;
+    let Step { mut state, interpreter, should_exit, .. } = step;
 
     terminal.draw(|f| {
         let size = f.size();
@@ -368,7 +402,8 @@ pub fn render_step(
     Ok(Step {
         state,
         interpreter,
-        should_exit
+        should_exit,
+        should_clear: false,
     })
 }
 
@@ -407,10 +442,11 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
         let state = ScriptState {
             ui: State::new(),
             wv: wave,
+            er: None,
         };
         let interpreter = LuaInterpreter::new(&config)?;
 
-        let step = Step { state, interpreter, should_exit: false };
+        let step = Step { state, interpreter, should_exit: false, should_clear: false };
         Ok(step)
     } else if opts.input.ends_with(".lua") {
         let loader = Box::new(EmptyLoader::new());
@@ -419,11 +455,12 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
         let state = ScriptState {
             ui: State::new(),
             wv: wave,
+            er: None,
         };
         let mut interpreter = LuaInterpreter::new(&config)?;
         let state = interpreter.run_file(state, opts.input)?;
 
-        let step = Step { state, interpreter, should_exit: false };
+        let step = Step { state, interpreter, should_exit: false, should_clear: false };
         Ok(step)
     } else if !plugins.is_empty() {
         let suffix = opts.input.split('.').last()
@@ -440,9 +477,10 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
             let state = ScriptState {
                 ui: State::new(),
                 wv: wave,
+                er: None,
             };
             let interpreter = LuaInterpreter::new(&config)?;
-            let step = Step { state, interpreter, should_exit: false };
+            let step = Step { state, interpreter, should_exit: false, should_clear: false };
             Ok(step)
         } else {
             Err(Error::UnknownFileFormat(opts.input.clone()))

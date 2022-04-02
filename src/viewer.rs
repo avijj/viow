@@ -12,6 +12,7 @@ use tui::text::{Text, Spans, Span};
 const MAX_NAME_COL_WIDTH: u16 = 100;
 const MAX_VALUE_COL_WIDTH: u16 = 40;
 
+#[derive(Debug)]
 pub struct InsertState {
     prompt: String,
     list: Vec<String>,
@@ -22,11 +23,13 @@ pub struct InsertState {
     suggestion_state: ListState,
 }
 
+#[derive(Debug)]
 pub enum Mode {
     Normal,
     Insert(InsertState),
 }
 
+#[derive(Debug)]
 pub struct State {
     /// Interaction mode currently active
     mode: Mode,

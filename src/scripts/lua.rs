@@ -38,6 +38,11 @@ impl LuaInterpreter {
         add_global_function!(lua, pop_filter);
         add_global_function!(lua, replace_prefix);
 
+        // Try to load viow.lua as entry to standard library. Silently ignore if not found.
+        let chunk = lua.load("require('viow')")
+            .set_name("init")?;
+        let _ = chunk.exec();
+
         Ok(Self {
             lua
         })
@@ -140,7 +145,10 @@ impl RunCommand for LuaInterpreter {
 
         let chunk = self.lua.load(&command)
             .set_name("Command")?;
-        chunk.exec()?;
+
+        if let Err(script_error) = chunk.exec() {
+            state.er = Some(script_error.into());
+        }
 
         let view: View = self.lua.globals().get("view")?;
         view.update_state(&mut state.ui);
