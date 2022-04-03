@@ -376,7 +376,7 @@ pub fn main_loop(stdout: std::io::Stdout, opts: Opts, config: Rc<Config>) -> Res
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
-    let mut step = setup(opts, config)?;
+    let mut step = setup(opts, config.clone())?;
 
     loop {
         step = render_step(&mut terminal, step)?;
@@ -390,6 +390,8 @@ pub fn main_loop(stdout: std::io::Stdout, opts: Opts, config: Rc<Config>) -> Res
             terminal.clear()?;
         }
     }
+
+    step.state.ui.save(&config)?;
 
     Ok(())
 }
@@ -485,7 +487,7 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
 
         //let mut interpreter = LuaInterpreter::new(state, wave);
         let state = ScriptState {
-            ui: State::new(),
+            ui: State::new(&config)?,
             wv: wave,
             er: None,
         };
@@ -498,7 +500,7 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
         let wave = Wave::load(loader/*, &config*/)?;
 
         let state = ScriptState {
-            ui: State::new(),
+            ui: State::new(&config)?,
             wv: wave,
             er: None,
         };
@@ -520,7 +522,7 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
             let wave = Wave::load(loader/*, &config*/)?;
 
             let state = ScriptState {
-                ui: State::new(),
+                ui: State::new(&config)?,
                 wv: wave,
                 er: None,
             };

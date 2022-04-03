@@ -1,3 +1,4 @@
+use rustyline;
 
 use std::path::PathBuf;
 use std::env::var;
@@ -7,26 +8,36 @@ use std::env::var;
 pub struct Config {
     config_dir: Option<PathBuf>,
     script_dir: Option<PathBuf>,
+    readline_config: rustyline::config::Config,
+    readline_history: Option<PathBuf>,
 }
 
 impl Config {
     pub fn load() -> Self {
         let config_dir = Self::find_config_dir();
         let script_dir = Self::find_script_dir(&config_dir);
+        let readline_config = Self::default_readline_config();
+        let readline_history = Self::find_readline_history(&config_dir);
 
         Self {
             config_dir,
             script_dir,
+            readline_config,
+            readline_history,
         }
     }
 
     pub fn test_config() -> Self {
         let config_dir = Some(PathBuf::from("./"));
         let script_dir = Some(PathBuf::from("./"));
+        let readline_config = Self::default_readline_config();
+        let readline_history = None;
 
         Self {
             config_dir,
             script_dir,
+            readline_config,
+            readline_history,
         }
     }
 
@@ -70,6 +81,29 @@ impl Config {
         }
     }
 
+    fn default_readline_config() -> rustyline::config::Config {
+        rustyline::config::Builder::new()
+            .max_history_size(1000)
+            .history_ignore_dups(true)
+            .auto_add_history(true)
+            .tab_stop(4)
+            .build()
+    }
+
+    fn find_readline_history(config_dir: &Option<PathBuf>) -> Option<PathBuf> {
+        config_dir.as_ref().and_then(|cfg_dir| {
+            let mut path = PathBuf::from(cfg_dir);
+            path.push("history");
+
+            if !path.exists() {
+                // Try to create file. On failure go on without history.
+                std::fs::File::create(&path)
+                    .map_or(None, |_| Some(path))
+            } else {
+                Some(path)
+            }
+        })
+    }
 
     pub fn get_script_dir(&self) -> Option<&PathBuf> {
         self.script_dir.as_ref()
@@ -89,6 +123,14 @@ impl Config {
 
     pub fn wave_cache_cycles_per_tile(&self) -> usize {
         1024
+    }
+
+    pub fn readline_config(&self) -> &rustyline::config::Config {
+        &self.readline_config
+    }
+
+    pub fn readline_history(&self) -> Option<&PathBuf> {
+        self.readline_history.as_ref()
     }
 }
 

@@ -1,6 +1,7 @@
 use crate::error::*;
 use crate::formatting::build_waveform;
 use crate::wave::Wave;
+use crate::config::Config;
 
 use tui::widgets::*;
 use tui::terminal::Frame;
@@ -9,6 +10,8 @@ use tui::layout::{Direction, Layout, Rect, Constraint};
 use tui::style::{Style, Color, Modifier};
 use tui::text::{Text, Spans, Span};
 use rustyline;
+
+use std::rc::Rc;
 
 type ReadlineEditor = rustyline::Editor<()>;
 
@@ -75,10 +78,13 @@ pub struct State {
 }
 
 impl State {
-    pub fn new() -> Self {
-        let line_editor = ReadlineEditor::new();
+    pub fn new(config: &Rc<Config>) -> Result<Self> {
+        let mut line_editor = ReadlineEditor::with_config(config.readline_config().clone());
+        if let Some(history) = config.readline_history() {
+            line_editor.load_history(history)?;
+        }
 
-        Self {
+        Ok(Self {
             mode: Mode::Normal,
             wave_cols: 1,
             wave_rows: 1,
@@ -92,7 +98,15 @@ impl State {
             zoom: 1,
             command: None,
             line_editor,
+        })
+    }
+
+    pub fn save(&mut self, config: &Rc<Config>) -> Result<()> {
+        if let Some(history) = config.readline_history() {
+            self.line_editor.append_history(history)?;
         }
+
+        Ok(())
     }
 
     pub fn resize(&mut self, wave_width: u16, wave_height: u16) {
