@@ -20,6 +20,10 @@ regex = "1"
 lru = "0.7"
 abi_stable = "0.10"
 viow-plugin-api = { git = "https://github.com/avijj/viow-plugin-api" }
+rustyline = "9"
 
 [dev-dependencies]
 tempdir = "0.3"
+
+[profile.release]
+debug = true

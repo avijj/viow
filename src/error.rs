@@ -5,6 +5,7 @@ use regex;
 use thiserror::Error;
 use viow_plugin_api::error::Error as PluginError;
 use abi_stable::library::LibraryError;
+use rustyline::error::ReadlineError;
 
 
 #[derive(Error,Debug)]
@@ -53,6 +54,9 @@ pub enum Error {
 
     #[error("Error in plugin: {0:}")]
     Plugin(#[from] PluginError),
+
+    #[error("Readline error: {0:}")]
+    Readline(#[from] ReadlineError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

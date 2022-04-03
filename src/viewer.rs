@@ -8,6 +8,9 @@ use tui::backend::Backend;
 use tui::layout::{Direction, Layout, Rect, Constraint};
 use tui::style::{Style, Color, Modifier};
 use tui::text::{Text, Spans, Span};
+use rustyline;
+
+type ReadlineEditor = rustyline::Editor<()>;
 
 const MAX_NAME_COL_WIDTH: u16 = 100;
 const MAX_VALUE_COL_WIDTH: u16 = 40;
@@ -66,10 +69,15 @@ pub struct State {
 
     /// State of the command buffer
     command: Option<String>,
+
+    /// Readline editor
+    line_editor: ReadlineEditor,
 }
 
 impl State {
     pub fn new() -> Self {
+        let line_editor = ReadlineEditor::new();
+
         Self {
             mode: Mode::Normal,
             wave_cols: 1,
@@ -83,6 +91,7 @@ impl State {
             table_state: TableState::default(),
             zoom: 1,
             command: None,
+            line_editor,
         }
     }
 
@@ -245,6 +254,10 @@ impl State {
                 }
             );
         }
+    }
+
+    pub fn line_editor_mut(&mut self) -> &mut ReadlineEditor {
+        &mut self.line_editor
     }
 
     pub fn start_command(&mut self) {

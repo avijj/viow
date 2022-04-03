@@ -21,14 +21,16 @@ use formatting::WaveFormat;
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use crossterm::terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
-use crossterm::ExecutableCommand;
-use std::path::PathBuf;
-use std::rc::Rc;
+use crossterm::{QueueableCommand, ExecutableCommand};
+use crossterm::cursor;
 use tui::backend::CrosstermBackend;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::Terminal;
 use viow_plugin_api::{load_root_module_in_directory, FiletypeLoader_Ref};
+use std::path::PathBuf;
+use std::rc::Rc;
 use std::collections::HashMap;
+use std::io::Write;
 
 
 type PluginMap = HashMap<String, FiletypeLoader_Ref>;
@@ -111,7 +113,7 @@ fn event_step_normal(
                 state.ui.put_command(c);
             }
 
-            Event::Key(KeyEvent {
+            /*Event::Key(KeyEvent {
                 code: KeyCode::Enter,
                 ..
             }) => {
@@ -142,7 +144,7 @@ fn event_step_normal(
                 enable_raw_mode()?;
 
                 should_clear = true;
-            }
+            }*/
 
             Event::Key(KeyEvent {
                 code: KeyCode::Backspace,
@@ -268,7 +270,50 @@ fn event_step_normal(
                 code: KeyCode::Char(':'),
                 ..
             }) => {
-                state.ui.start_command();
+                //state.ui.start_command();
+                let mut stdout = std::io::stdout();
+                stdout.execute(cursor::Show)?;
+
+                let rl = state.ui.line_editor_mut();
+                let readline = rl.readline(":");
+                match readline {
+                    Ok(cmd) => {
+                        disable_raw_mode()?;
+                        stdout
+                            .queue(LeaveAlternateScreen)?
+                            .queue(cursor::Show)?
+                            .flush()?;
+
+                        let res = interpreter.run_command(state, cmd);
+                        match res {
+                            Ok(new_state) => {
+                                if let Some(ref script_error) = new_state.er {
+                                    println!("Error: {}", script_error);
+                                    println!("*** Press enter to continue ***");
+                                    crossterm::event::read()?;
+                                }
+
+                                state = new_state
+                            }
+
+                            Err(err) => {
+                                return Err(err);
+                            }
+                        };
+
+                        stdout
+                            .queue(cursor::Hide)?
+                            .queue(EnterAlternateScreen)?
+                            .flush()?;
+                        enable_raw_mode()?;
+                    }
+
+                    // silently ignore readline errors such as Ctrl-C
+                    Err(_) => {}
+                }
+
+                stdout.execute(cursor::Hide)?;
+                should_clear = true;
             }
 
             // Enter insert mode 'i'
