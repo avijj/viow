@@ -384,6 +384,7 @@ impl State {
                 }
                 istate.at += 1;
                 istate.list_state.select(Some(istate.at));
+                istate.suggestion_state.select(None);
             }
 
             _ => {}
