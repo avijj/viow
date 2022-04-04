@@ -1,5 +1,6 @@
 mod api;
 
+use crate::PluginMap;
 use super::*;
 use crate::config::Config;
 use crate::viewer;
@@ -26,12 +27,14 @@ pub struct LuaInterpreter {
 }
 
 impl LuaInterpreter {
-    pub fn new(config: impl AsRef<Config>) -> Result<Self> {
+    pub fn new(config: impl AsRef<Config>, plugin_map: PluginMap) -> Result<Self> {
         let lua = Lua::new();
 
+        Self::install_plugins(&lua, plugin_map)?;
         Self::configure_lua_path(&lua, config)?;
 
         add_global_function!(lua, load_vcd);
+        add_global_function!(lua, load);
         add_global_function!(lua, filter_signals);
         add_global_function!(lua, grep);
         add_global_function!(lua, remove_comments);
@@ -46,6 +49,12 @@ impl LuaInterpreter {
         Ok(Self {
             lua
         })
+    }
+
+    fn install_plugins(lua: &Lua, plugin_map: PluginMap) -> Result<()> {
+        let plugins = Plugins { plugin_map };
+        lua.globals().set("_plugins", plugins)?;
+        Ok(())
     }
 
     fn configure_lua_path(lua: &Lua, config: impl AsRef<Config>) -> Result<()> {
@@ -137,6 +146,15 @@ impl<'lua> FromLua<'lua> for Wave {
         }
     }
 }
+
+
+#[derive(Clone)]
+struct Plugins {
+    plugin_map: PluginMap,
+}
+
+impl UserData for Plugins { }
+
 
 impl RunCommand for LuaInterpreter {
     fn run_command(&mut self, mut state: ScriptState, command: String) -> Result<ScriptState> {

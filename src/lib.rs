@@ -33,7 +33,7 @@ use std::collections::HashMap;
 use std::io::Write;
 
 
-type PluginMap = HashMap<String, FiletypeLoader_Ref>;
+pub type PluginMap = HashMap<String, FiletypeLoader_Ref>;
 
 pub struct Step {
     pub state: ScriptState,
@@ -491,7 +491,7 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
             wv: wave,
             er: None,
         };
-        let interpreter = LuaInterpreter::new(&config)?;
+        let interpreter = LuaInterpreter::new(&config, plugins)?;
 
         let step = Step { state, interpreter, should_exit: false, should_clear: false };
         Ok(step)
@@ -504,7 +504,7 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
             wv: wave,
             er: None,
         };
-        let mut interpreter = LuaInterpreter::new(&config)?;
+        let mut interpreter = LuaInterpreter::new(&config, plugins)?;
         let state = interpreter.run_file(state, opts.input)?;
 
         let step = Step { state, interpreter, should_exit: false, should_clear: false };
@@ -526,7 +526,7 @@ pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
                 wv: wave,
                 er: None,
             };
-            let interpreter = LuaInterpreter::new(&config)?;
+            let interpreter = LuaInterpreter::new(&config, plugins)?;
             let step = Step { state, interpreter, should_exit: false, should_clear: false };
             Ok(step)
         } else {
