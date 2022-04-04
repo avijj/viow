@@ -17,13 +17,17 @@ pub(super) fn load<'callback>(lua: &'callback Lua, args: (String, u64, String)) 
     let suffix = filename.split('.').last()
         .ok_or(Error::UnknownFileFormat(filename.clone()))?;
 
-    if let Some(plugin) = plugins.plugin_map.get(suffix) {
-        let cycle_time = SimTime::new(period, SimTimeUnit::from_string(timeunit)?);
-        let loader = Box::new(PluggedLoader::new(plugin.clone(), filename.as_str(), cycle_time)?);
-        let new_wave = Wave::load(loader)?;
-        Ok(new_wave)
+    if suffix == "vcd" {
+        load_vcd(lua, (filename, period, timeunit))
     } else {
-        Err(Error::UnknownFileFormat(filename.clone()).into())
+        if let Some(plugin) = plugins.plugin_map.get(suffix) {
+            let cycle_time = SimTime::new(period, SimTimeUnit::from_string(timeunit)?);
+            let loader = Box::new(PluggedLoader::new(plugin.clone(), filename.as_str(), cycle_time)?);
+            let new_wave = Wave::load(loader)?;
+            Ok(new_wave)
+        } else {
+            Err(Error::UnknownFileFormat(filename.clone()).into())
+        }
     }
 }
 
