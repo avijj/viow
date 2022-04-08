@@ -322,7 +322,23 @@ pub fn main_loop(stdout: std::io::Stdout, opts: Opts, config: Rc<Config>) -> Res
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
+    // switch to primary screen in cooked mode to potentially print text during configuration.
+    disable_raw_mode()?;
+    terminal
+        .backend_mut()
+        .queue(LeaveAlternateScreen)?
+        .queue(cursor::Show)?
+        .flush()?;
+
     let mut step = setup(opts, config.clone())?;
+
+    // turn back to alternate screen and raw-mode
+    terminal
+        .backend_mut()
+        .queue(cursor::Hide)?
+        .queue(EnterAlternateScreen)?
+        .flush()?;
+    enable_raw_mode()?;
 
     loop {
         step = render_step(&mut terminal, step)?;
