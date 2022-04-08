@@ -104,258 +104,204 @@ fn event_step_normal(
 ) -> Result<Step> {
     let Step { mut state, mut interpreter, mut should_exit, mut should_clear } = step;
 
-    if state.ui.in_command() {
-        match ev {
-            Event::Key(KeyEvent {
-                code: KeyCode::Char(c),
-                ..
-            }) => {
-                state.ui.put_command(c);
+    match ev {
+        // quit
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('q'),
+            ..
+        }) => {
+            should_exit = true;
+        }
+
+        // down
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('j'),
+            ..
+        }) => {
+            state.ui.move_cursor_down();
+        }
+
+        // page down
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('J'),
+            ..
+        }) => {
+            state.ui.move_page_down();
+        }
+
+        // up
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('k'),
+            ..
+        }) => {
+            state.ui.move_cursor_up();
+        }
+
+        // page up
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('K'),
+            ..
+        }) => {
+            state.ui.move_page_up();
+        }
+
+        // left
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('h'),
+            ..
+        }) => {
+            state.ui.move_cursor_left();
+        }
+
+        // page left
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('H'),
+            ..
+        }) => {
+            state.ui.move_page_left();
+        }
+
+        // right
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('l'),
+            ..
+        }) => {
+            state.ui.move_cursor_right();
+        }
+
+        // page right
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('L'),
+            ..
+        }) => {
+            state.ui.move_page_right();
+        }
+
+        // next transition
+        Event::Key(KeyEvent { code: KeyCode::Char('w'), .. }) => {
+            if state.ui.get_cursor_row().is_some() {
+                let cur_row = state.ui.get_cur_wave_row();
+                if let Some(next) = state.wv.cached_next_transition(cur_row, state.ui.get_cur_wave_col()) {
+                    state.ui.set_cur_wave_col(next);
+                }
             }
+        }
 
-            /*Event::Key(KeyEvent {
-                code: KeyCode::Enter,
-                ..
-            }) => {
-                let mut stdout = std::io::stdout();
-                let cmd = state.ui.pop_command().ok_or(Error::NoCommand)?;
+        // prev transition
+        Event::Key(KeyEvent { code: KeyCode::Char('b'), .. }) => {
+            if state.ui.get_cursor_row().is_some() {
+                let cur_row = state.ui.get_cur_wave_row();
+                if let Some(prev) = state.wv.cached_prev_transition(cur_row, state.ui.get_cur_wave_col()) {
+                    state.ui.set_cur_wave_col(prev);
+                }
+            }
+        }
 
-                disable_raw_mode()?;
-                stdout.execute(LeaveAlternateScreen)?;
+        // zoom in '+'
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('+'),
+            ..
+        }) => {
+            state.ui.zoom_in();
+        }
 
-                let res = interpreter.run_command(state, cmd);
-                match res {
-                    Ok(new_state) => {
-                        if let Some(ref script_error) = new_state.er {
-                            println!("Error: {}", script_error);
-                            println!("*** Press enter to continue ***");
-                            crossterm::event::read()?;
+        // zoom out '-'
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('-'),
+            ..
+        }) => {
+            state.ui.zoom_out();
+        }
+
+        // Enter command ':'
+        Event::Key(KeyEvent {
+            code: KeyCode::Char(':'),
+            ..
+        }) => {
+            let mut stdout = std::io::stdout();
+            stdout.execute(cursor::Show)?;
+
+            let rl = state.ui.line_editor_mut();
+            let readline = rl.readline(":");
+            match readline {
+                Ok(cmd) => {
+                    disable_raw_mode()?;
+                    stdout
+                        .queue(LeaveAlternateScreen)?
+                        .queue(cursor::Show)?
+                        .flush()?;
+
+                    let res = interpreter.run_command(state, cmd);
+                    match res {
+                        Ok(new_state) => {
+                            if let Some(ref script_error) = new_state.er {
+                                println!("Error: {}", script_error);
+                                println!("*** Press enter to continue ***");
+                                crossterm::event::read()?;
+                            }
+
+                            state = new_state
                         }
 
-                        state = new_state
-                    }
-
-                    Err(err) => {
-                        return Err(err);
-                    }
-                };
-
-                stdout.execute(EnterAlternateScreen)?;
-                enable_raw_mode()?;
-
-                should_clear = true;
-            }*/
-
-            Event::Key(KeyEvent {
-                code: KeyCode::Backspace,
-                ..
-            }) => {
-                state.ui.take_command();
-            }
-
-            _ => {}
-        }
-    } else {
-        match ev {
-            // quit
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('q'),
-                ..
-            }) => {
-                should_exit = true;
-            }
-
-            // down
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('j'),
-                ..
-            }) => {
-                state.ui.move_cursor_down();
-            }
-
-            // page down
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('J'),
-                ..
-            }) => {
-                state.ui.move_page_down();
-            }
-
-            // up
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('k'),
-                ..
-            }) => {
-                state.ui.move_cursor_up();
-            }
-
-            // page up
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('K'),
-                ..
-            }) => {
-                state.ui.move_page_up();
-            }
-
-            // left
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('h'),
-                ..
-            }) => {
-                state.ui.move_cursor_left();
-            }
-
-            // page left
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('H'),
-                ..
-            }) => {
-                state.ui.move_page_left();
-            }
-
-            // right
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('l'),
-                ..
-            }) => {
-                state.ui.move_cursor_right();
-            }
-
-            // page right
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('L'),
-                ..
-            }) => {
-                state.ui.move_page_right();
-            }
-
-            // next transition
-            Event::Key(KeyEvent { code: KeyCode::Char('w'), .. }) => {
-                if state.ui.get_cursor_row().is_some() {
-                    let cur_row = state.ui.get_cur_wave_row();
-                    if let Some(next) = state.wv.cached_next_transition(cur_row, state.ui.get_cur_wave_col()) {
-                        state.ui.set_cur_wave_col(next);
-                    }
-                }
-            }
-
-            // prev transition
-            Event::Key(KeyEvent { code: KeyCode::Char('b'), .. }) => {
-                if state.ui.get_cursor_row().is_some() {
-                    let cur_row = state.ui.get_cur_wave_row();
-                    if let Some(prev) = state.wv.cached_prev_transition(cur_row, state.ui.get_cur_wave_col()) {
-                        state.ui.set_cur_wave_col(prev);
-                    }
-                }
-            }
-
-            // zoom in '+'
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('+'),
-                ..
-            }) => {
-                state.ui.zoom_in();
-            }
-
-            // zoom out '-'
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('-'),
-                ..
-            }) => {
-                state.ui.zoom_out();
-            }
-
-            // Enter command ':'
-            Event::Key(KeyEvent {
-                code: KeyCode::Char(':'),
-                ..
-            }) => {
-                //state.ui.start_command();
-                let mut stdout = std::io::stdout();
-                stdout.execute(cursor::Show)?;
-
-                let rl = state.ui.line_editor_mut();
-                let readline = rl.readline(":");
-                match readline {
-                    Ok(cmd) => {
-                        disable_raw_mode()?;
-                        stdout
-                            .queue(LeaveAlternateScreen)?
-                            .queue(cursor::Show)?
-                            .flush()?;
-
-                        let res = interpreter.run_command(state, cmd);
-                        match res {
-                            Ok(new_state) => {
-                                if let Some(ref script_error) = new_state.er {
-                                    println!("Error: {}", script_error);
-                                    println!("*** Press enter to continue ***");
-                                    crossterm::event::read()?;
-                                }
-
-                                state = new_state
-                            }
-
-                            Err(err) => {
-                                return Err(err);
-                            }
-                        };
-
-                        stdout
-                            .queue(cursor::Hide)?
-                            .queue(EnterAlternateScreen)?
-                            .flush()?;
-                        enable_raw_mode()?;
-                    }
-
-                    // silently ignore readline errors such as Ctrl-C
-                    Err(_) => {}
-                }
-
-                stdout.execute(cursor::Hide)?;
-                should_clear = true;
-            }
-
-            // Enter insert mode 'i'
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('i'),
-                ..
-            }) => {
-                state.wv.get_config_mut().enable_filter_list = false;
-                state.wv.reconfigure()?;
-                state.wv = state.wv.reload()?;
-                let unfiltered = state.wv.get_names().clone();
-
-                state.wv.get_config_mut().enable_filter_list = true;
-                state.wv.reconfigure()?;
-                state.wv = state.wv.reload()?;
-                let insert_at = state.ui.get_cursor_row().unwrap_or(0);
-                state
-                    .ui
-                    .start_insert_mode(unfiltered, state.wv.get_names().clone(), insert_at);
-            }
-
-            // toggle type
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('t'),
-                ..
-            }) => {
-                if let Some(cur_row) = state.ui.get_cursor_row() {
-                    let cur_fmt = state.wv.formatter(cur_row);
-                    let next_fmt = match cur_fmt {
-                        WaveFormat::Vector(sz) => WaveFormat::BitVector(sz),
-                        WaveFormat::BitVector(sz) => WaveFormat::Vector(sz),
-
-                        other => other
+                        Err(err) => {
+                            return Err(err);
+                        }
                     };
 
-                    state.wv.set_formatter(cur_row, next_fmt);
+                    stdout
+                        .queue(cursor::Hide)?
+                        .queue(EnterAlternateScreen)?
+                        .flush()?;
+                    enable_raw_mode()?;
                 }
+
+                // silently ignore readline errors such as Ctrl-C
+                Err(_) => {}
             }
 
-
-            _ => {}
+            stdout.execute(cursor::Hide)?;
+            should_clear = true;
         }
+
+        // Enter insert mode 'i'
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('i'),
+            ..
+        }) => {
+            state.wv.get_config_mut().enable_filter_list = false;
+            state.wv.reconfigure()?;
+            state.wv = state.wv.reload()?;
+            let unfiltered = state.wv.get_names().clone();
+
+            state.wv.get_config_mut().enable_filter_list = true;
+            state.wv.reconfigure()?;
+            state.wv = state.wv.reload()?;
+            let insert_at = state.ui.get_cursor_row().unwrap_or(0);
+            state
+                .ui
+                .start_insert_mode(unfiltered, state.wv.get_names().clone(), insert_at);
+        }
+
+        // toggle type
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('t'),
+            ..
+        }) => {
+            if let Some(cur_row) = state.ui.get_cursor_row() {
+                let cur_fmt = state.wv.formatter(cur_row);
+                let next_fmt = match cur_fmt {
+                    WaveFormat::Vector(sz) => WaveFormat::BitVector(sz),
+                    WaveFormat::BitVector(sz) => WaveFormat::Vector(sz),
+
+                    other => other
+                };
+
+                state.wv.set_formatter(cur_row, next_fmt);
+            }
+        }
+
+
+        _ => {}
     }
 
     Ok(Step { state, interpreter, should_exit, should_clear })
@@ -441,9 +387,6 @@ pub fn render_step(
 
         let statusline = build_statusline(&state.ui);
         f.render_widget(statusline, stack[1]);
-
-        let commandline = build_commandline(&state.ui);
-        f.render_widget(commandline, stack[2]);
     })?;
 
     Ok(Step {

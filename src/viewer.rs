@@ -70,9 +70,6 @@ pub struct State {
     /// Number of columns in view for a data column
     zoom: usize,
 
-    /// State of the command buffer
-    command: Option<String>,
-
     /// Readline editor
     line_editor: ReadlineEditor,
 }
@@ -96,7 +93,6 @@ impl State {
             cur_wave_col: 0,
             table_state: TableState::default(),
             zoom: 1,
-            command: None,
             line_editor,
         })
     }
@@ -273,39 +269,6 @@ impl State {
     pub fn line_editor_mut(&mut self) -> &mut ReadlineEditor {
         &mut self.line_editor
     }
-
-    pub fn start_command(&mut self) {
-        self.command = Some(String::new());
-    }
-
-    pub fn in_command(&self) -> bool {
-        self.command.is_some()
-    }
-
-    pub fn put_command(&mut self, c: char) {
-        if let Some(ref mut txt) = self.command {
-            txt.push(c);
-        }
-    }
-
-    pub fn take_command(&mut self) -> Option<char> {
-        if let Some(ref mut txt) = self.command {
-            txt.pop()
-        } else {
-            None
-        }
-    }
-
-    pub fn pop_command(&mut self) -> Option<String> {
-        self.command.take()
-    }
-
-    //pub fn exec_command<I: RunCommand>(&mut self, interpreter: &mut I) -> Result<()> {
-        //let cmd = self.command.take()
-            //.ok_or(Error::NoCommand)?;
-        //interpreter.run_command(self, cmd)?;
-        //Ok(())
-    //}
     
     pub fn start_insert_mode(&mut self, signals: Vec<String>, mut list: Vec<String>, insert_at: usize) {
         list.insert(insert_at, "#".into());
@@ -543,20 +506,6 @@ pub fn build_statusline(state: &State) -> Paragraph {
         Spans::from(vec![
             Span::raw(format!("Cursor: {},{}", state.cur_wave_row, state.cur_wave_col)),
             Span::raw(mode_txt),
-        ])
-    ];
-
-    Paragraph::new(line_txt)
-}
-
-pub fn build_commandline(state: &State) -> Paragraph {
-    let line_txt = vec![
-        Spans::from(vec![
-            if let Some(ref txt) = state.command {
-                Span::raw(format!(":{}", txt))
-            } else {
-                Span::raw("")
-            }
         ])
     ];
 
