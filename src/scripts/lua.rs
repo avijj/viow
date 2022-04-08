@@ -37,6 +37,8 @@ impl LuaInterpreter {
         add_global_function!(lua, load);
         add_global_function!(lua, filter_signals);
         add_global_function!(lua, grep);
+        add_global_function!(lua, ignore);
+        add_global_function!(lua, allow_deny);
         add_global_function!(lua, remove_comments);
         add_global_function!(lua, pop_filter);
         add_global_function!(lua, replace_prefix);

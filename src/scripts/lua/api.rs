@@ -53,6 +53,26 @@ pub(super) fn grep<'callback>(_lua: &'callback Lua, args: (Wave, String)) -> mlu
     Ok(wave)
 }
 
+pub(super) fn ignore<'callback>(_lua: &'callback Lua, args: (Wave, Vec<String>)) -> mlua::Result<Wave>
+{
+    let (wave, deny_list) = args;
+
+    let filter = Box::new(filter::Ignore::new(&vec![], &deny_list)?);
+    let wave = wave.push_filter(filter)?;
+
+    Ok(wave)
+}
+
+pub(super) fn allow_deny<'callback>(_lua: &'callback Lua, args: (Wave, Vec<String>, Vec<String>)) -> mlua::Result<Wave>
+{
+    let (wave, allow_list, deny_list) = args;
+
+    let filter = Box::new(filter::Ignore::new(&allow_list, &deny_list)?);
+    let wave = wave.push_filter(filter)?;
+
+    Ok(wave)
+}
+
 pub(super) fn remove_comments<'callback>(_lua: &'callback Lua, wave: Wave) -> mlua::Result<Wave>
 {
     let filter = Box::new(filter::RemoveComments::new());
