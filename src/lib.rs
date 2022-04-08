@@ -454,10 +454,9 @@ pub fn render_step(
     })
 }
 
-fn load_plugins(opts: &Opts) -> Result<PluginMap> {
+fn load_plugins(opts: &Opts, config: &Rc<Config>) -> Result<PluginMap> {
     let mut rv = PluginMap::new();
-
-    for plugin_dir in opts.plugin.iter() {
+    let mut add_plugin = |plugin_dir| -> Result<()> {
         let plugin = load_root_module_in_directory(plugin_dir)?;
         let name = plugin.get_name()().to_string();
         let load_plugin = plugin.get_loader()()
@@ -466,13 +465,22 @@ fn load_plugins(opts: &Opts) -> Result<PluginMap> {
         let suffix = load_plugin.get_suffix()().into_string();
 
         rv.insert(suffix, load_plugin);
+        Ok(())
+    };
+
+    for plugin_dir in config.get_plugin_dirs() {
+        add_plugin(plugin_dir)?;
+    }
+
+    for plugin_dir in opts.plugin.iter() {
+        add_plugin(plugin_dir)?;
     }
 
     Ok(rv)
 }
 
 pub fn setup(opts: Opts, config: Rc<Config>) -> Result<Step> {
-    let plugins = load_plugins(&opts)?;
+    let plugins = load_plugins(&opts, &config)?;
 
     if opts.input.ends_with(".vcd") {
         //let cycle_step = opts.cycle_step.ok_or(Error::MissingArgument(

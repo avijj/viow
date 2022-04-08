@@ -8,6 +8,7 @@ use std::env::var;
 pub struct Config {
     config_dir: Option<PathBuf>,
     script_dir: Option<PathBuf>,
+    plugin_dirs: Vec<PathBuf>,
     readline_config: rustyline::config::Config,
     readline_history: Option<PathBuf>,
 }
@@ -16,12 +17,14 @@ impl Config {
     pub fn load() -> Self {
         let config_dir = Self::find_config_dir();
         let script_dir = Self::find_script_dir(&config_dir);
+        let plugin_dirs = Self::find_plugins(&config_dir);
         let readline_config = Self::default_readline_config();
         let readline_history = Self::find_readline_history(&config_dir);
 
         Self {
             config_dir,
             script_dir,
+            plugin_dirs,
             readline_config,
             readline_history,
         }
@@ -30,12 +33,14 @@ impl Config {
     pub fn test_config() -> Self {
         let config_dir = Some(PathBuf::from("./"));
         let script_dir = Some(PathBuf::from("./"));
+        let plugin_dirs = vec![];
         let readline_config = Self::default_readline_config();
         let readline_history = None;
 
         Self {
             config_dir,
             script_dir,
+            plugin_dirs,
             readline_config,
             readline_history,
         }
@@ -81,6 +86,27 @@ impl Config {
         }
     }
 
+    fn find_plugins(config_dir: &Option<PathBuf>) -> Vec<PathBuf> {
+        let mut rv = config_dir.as_ref()
+            .map(|cfg| {
+                let mut plugins = cfg.clone();
+                plugins.push("plugins");
+                plugins
+            })
+            .and_then(|cfg| std::fs::read_dir(cfg).ok())
+            .map(|dir| {
+                dir
+                    .filter_map(|dir_entry| dir_entry.ok())
+                    .map(|dir_entry| dir_entry.path())
+                    .filter(|path| path.is_dir())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or(vec![]);
+
+        rv.sort_unstable();
+        rv
+    }
+
     fn default_readline_config() -> rustyline::config::Config {
         rustyline::config::Builder::new()
             .max_history_size(1000)
@@ -111,6 +137,10 @@ impl Config {
 
     pub fn get_config_dir(&self) -> Option<&PathBuf> {
         self.config_dir.as_ref()
+    }
+
+    pub fn get_plugin_dirs(&self) -> &[PathBuf] {
+        &self.plugin_dirs
     }
 
     pub fn wave_cache_capacity(&self) -> usize {
