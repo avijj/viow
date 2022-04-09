@@ -125,12 +125,10 @@ where
         times: &SimTimeRange,
     ) -> Result<CycleValues<Self::Value>> {
         match self {
-            Self::Fil(ref mut prev, ref filter) => {
+            Self::Fil(ref mut prev, ref mut filter) => {
                 let trans_ids = filter.rev_translate_ids(ids.to_vec())?;
                 let mut vals = prev.sample(&trans_ids, times)?;
-                for elem in vals.iter_mut() {
-                    filter.transform(elem);
-                }
+                filter.transform(&mut vals);
 
                 Ok(vals)
             }

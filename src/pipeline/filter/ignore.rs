@@ -53,9 +53,6 @@ impl<I> TranslateSignals<I> for Ignore {
 
 impl Transform for Ignore {
     type Value = rug::Integer;
-
-    fn transform(&self, _: &mut Self::Value) {
-    }
 }
 
 impl ConfigurePipeline for Ignore {}

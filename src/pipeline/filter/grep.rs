@@ -46,9 +46,6 @@ impl<I> TranslateSignals<I> for Grep {
 
 impl Transform for Grep {
     type Value = rug::Integer;
-
-    fn transform(&self, _: &mut Self::Value) {
-    }
 }
 
 impl ConfigurePipeline for Grep {}

@@ -94,3 +94,14 @@ pub(super) fn replace_prefix<'callback>(_lua: &'callback Lua, args: (Wave, Strin
 
     Ok(wave)
 }
+
+
+pub(super) fn analog<'callback>(_lua: &'callback Lua, args: (Wave, Vec<String>, f64, f64)) -> mlua::Result<Wave>
+{
+    let (wave, patterns, min, max) = args;
+
+    let filter = Box::new(filter::Analog::new(&patterns, min, max)?);
+    let wave = wave.push_filter(filter)?;
+
+    Ok(wave)
+}

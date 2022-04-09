@@ -42,6 +42,7 @@ impl LuaInterpreter {
         add_global_function!(lua, remove_comments);
         add_global_function!(lua, pop_filter);
         add_global_function!(lua, replace_prefix);
+        add_global_function!(lua, analog);
 
         // Try to load viow.lua as entry to standard library. Silently ignore if not found.
         let chunk = lua.load("require('viow')")

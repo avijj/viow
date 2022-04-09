@@ -70,8 +70,6 @@ impl<I> TranslateSignals<I> for SignalList {
 
 impl Transform for SignalList {
     type Value = rug::Integer;
-
-    fn transform(&self, _: &mut Self::Value) {}
 }
 
 impl ConfigurePipeline for SignalList {

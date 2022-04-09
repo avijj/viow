@@ -43,9 +43,6 @@ impl<I> TranslateSignals<I> for ReplacePrefix {
 
 impl Transform for ReplacePrefix {
     type Value = rug::Integer;
-
-    fn transform(&self, _: &mut Self::Value) {
-    }
 }
 
 impl ConfigurePipeline for ReplacePrefix {}

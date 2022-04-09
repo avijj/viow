@@ -33,9 +33,6 @@ impl<I> TranslateSignals<I> for RemoveComments {
 
 impl Transform for RemoveComments {
     type Value = rug::Integer;
-
-    fn transform(&self, _: &mut Self::Value) {
-    }
 }
 
 impl ConfigurePipeline for RemoveComments {}
