@@ -482,8 +482,6 @@ pub fn build_table<'a>(wave: &'a mut Wave, state: &State) -> (u16, u16, Table<'a
     max_name_width = std::cmp::min(max_name_width, MAX_NAME_COL_WIDTH);
     max_value_width = std::cmp::min(max_value_width, MAX_VALUE_COL_WIDTH);
 
-    // This is necessary due to tui's API. We need to pass constraint as reference. We can't pass a
-    // reference to function owned variable.
     (
         max_name_width,
         max_value_width,

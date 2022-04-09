@@ -7,6 +7,7 @@ pub enum WaveFormat {
     Bit,
     Vector(u32),
     BitVector(u32),
+    Analog(u32, f64, f64),
     Comment,
 }
 
@@ -54,6 +55,17 @@ fn build_waveform_bit<'a, T>(line_data: T, zoom: usize) -> String
         .collect()
 }
 
+fn build_waveform_analog<'a, T>(line_data: T, zoom: usize, min: f64, max: f64) -> String 
+    where
+        T: Iterator<Item = &'a Integer>
+{
+    line_data
+        .map(|x| core::iter::repeat(x).take(zoom))
+        .flatten()
+        .map(|x| format_analog(x, min, max))
+        .collect()
+}
+
 fn build_waveform_comment<'a, T>(line_data: T, zoom: usize) -> String
     where
         T: Iterator<Item = &'a Integer>
@@ -71,6 +83,7 @@ pub fn build_waveform<'a, T>(line_data: T, format: WaveFormat, zoom: usize) -> S
         WaveFormat::Bit => build_waveform_bit(line_data, zoom),
         WaveFormat::Vector(_) => build_waveform_vec(line_data, zoom),
         WaveFormat::BitVector(_) => build_waveform_bitvec(line_data, zoom),
+        WaveFormat::Analog(_, min, max) => build_waveform_analog(line_data, zoom, min, max),
         WaveFormat::Comment => build_waveform_comment(line_data, zoom),
     }
 }
@@ -79,7 +92,7 @@ pub fn build_waveform<'a, T>(line_data: T, format: WaveFormat, zoom: usize) -> S
 pub fn format_value(value: &Integer, format: WaveFormat) -> String {
     match format {
         WaveFormat::Bit => format!("{:b}", value),
-        WaveFormat::Vector(size) => {
+        WaveFormat::Vector(size) | WaveFormat::Analog(size, _, _) => {
             let hex_digits = if size % 4 == 0 {
                 size / 4
             } else {
@@ -98,6 +111,22 @@ fn format_bit(value: &Integer) -> char {
         '▁'
     } else {
         '▇'
+    }
+}
+
+fn format_analog(value: &Integer, val_min: f64, val_max: f64) -> char {
+    const SCALE: f64 = 8.0;
+    const SYMBOLS: &'static [char] = &[ '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█' ];
+
+    let norm = val_max - val_min;
+    let x = (((value.to_f64() - val_min) / norm) * SCALE).round();
+
+    if x < 0.0 {
+        SYMBOLS[0]
+    } else if x as usize >= SYMBOLS.len() {
+        SYMBOLS[SYMBOLS.len() - 1]
+    } else {
+        SYMBOLS[x as usize]
     }
 }
 

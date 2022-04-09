@@ -292,6 +292,8 @@ fn event_step_normal(
                 let next_fmt = match cur_fmt {
                     WaveFormat::Vector(sz) => WaveFormat::BitVector(sz),
                     WaveFormat::BitVector(sz) => WaveFormat::Vector(sz),
+                    //WaveFormat::BitVector(sz) => WaveFormat::Analog(sz, 0., 64.),//WaveFormat::Vector(sz),
+                    //WaveFormat::Analog(sz, _, _) => WaveFormat::Vector(sz),
 
                     other => other
                 };
