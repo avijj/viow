@@ -4,25 +4,34 @@ use crate::pipeline::*;
 
 /// Pipeline adapter providing contiguous signal ids.
 pub(super) struct PipelineCId {
+    /// Underlying Pipeline that is adapted.
     pipe: Pipeline,
+
+    /// Maps a contiguous range of ids to a potentially sparse set
+    ///
+    /// Index is id returned by query_source. Stored value at each position is the matching id in
+    /// the underlying pipe.
+    idmap: Vec<usize>,
 }
 
 impl PipelineCId {
-    pub(super) fn new(source: SrcBox) -> Self {
+    pub(super) fn new(source: SrcBox) -> Result<Self> {
         let pipe = Pipeline::new(source);
+        let idmap = Vec::new();
 
-        Self { pipe }
+        Ok(Self { pipe, idmap })
     }
 
     pub(super) fn push(self, stage: FilterBox) -> Self {
         Self {
             pipe: self.pipe.push(stage),
+            ..self
         }
     }
 
     pub(super) fn pop(self) -> (Self, Option<FilterBox>) {
         let (pipe, tail) = self.pipe.pop();
-        let rv = Self { pipe };
+        let rv = Self { pipe, ..self };
 
         (rv, tail)
     }
@@ -32,8 +41,29 @@ impl QuerySource for PipelineCId {
     type Id = usize;
     type IntoSignalIter = Vec<Signal<Self::Id>>;
 
+    fn query_init(&mut self) -> Result<()> {
+        let idmap = self.pipe.query_signals()?
+            .into_iter()
+            .map(|signal| signal.id)
+            .collect();
+
+        self.idmap = idmap;
+        Ok(())
+    }
+
     fn query_signals(&self) -> Result<Self::IntoSignalIter> {
-        self.pipe.query_signals()
+        Ok(
+            self.pipe.query_signals()?
+                .into_iter()
+                .enumerate()
+                .map(|(i, signal)| {
+                    Signal {
+                        id: i,
+                        ..signal
+                    }
+                })
+                .collect()
+        )
     }
 
     fn query_time_range(&self) -> Result<SimTimeRange> {
@@ -58,7 +88,11 @@ impl Sample for PipelineCId {
         ids: &Vec<Self::Id>,
         times: &SimTimeRange,
     ) -> Result<CycleValues<Self::Value>> {
-        self.pipe.sample(ids, times)
+        let mapped_ids: Vec<usize> = ids.iter()
+            .filter_map(|id| self.idmap.get(*id))
+            .map(|i| *i)
+            .collect();
+        self.pipe.sample(&mapped_ids, times)
     }
 }
 

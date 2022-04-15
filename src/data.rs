@@ -33,6 +33,7 @@ pub trait QuerySource {
     type Id;
     type IntoSignalIter: IntoIterator<Item = Signal<Self::Id>>;
 
+    fn query_init(&mut self) -> Result<()> { Ok(()) }
     fn query_signals(&self) -> Result<Self::IntoSignalIter>;
     fn query_time_range(&self) -> Result<SimTimeRange>;
     fn query_time(&self, cycle: usize) -> SimTime;

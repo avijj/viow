@@ -35,12 +35,13 @@ pub struct Wave
 
 impl Wave {
     pub fn load(source: SrcBox/*, config: &Config*/) -> Result<Self> {
-        let pipe = PipelineCId::new(source);
+        let pipe = PipelineCId::new(source)?;
         let config = PipelineConfig::default();
         Self::load_from_pipe(pipe, config)
     }
 
-    fn load_from_pipe(pipe: PipelineCId, config: PipelineConfig) -> Result<Self> {
+    fn load_from_pipe(mut pipe: PipelineCId, config: PipelineConfig) -> Result<Self> {
+        pipe.query_init()?;
         let signals = pipe.query_signals()?;
         let num_signals = signals.len();
         let mut ids = Vec::with_capacity(signals.len());

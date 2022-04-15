@@ -152,7 +152,7 @@ mod test {
         const CYC_PER_TILE: usize = 23;
 
         let loader = Box::new(VcdLoader::new("examples/verilator.vcd", Some(SimTime::from_ps(1))).unwrap());
-        let mut pipe = PipelineCId::new(loader);
+        let mut pipe = PipelineCId::new(loader).unwrap();
         let num_signals = pipe.query_signals().unwrap().len();
         let num_cycles = pipe.query_cycle_count();
         let mut cache = Cache::new(CAPACITY, SIG_PER_TILE, CYC_PER_TILE, num_signals, num_cycles);
