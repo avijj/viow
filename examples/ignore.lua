@@ -1,4 +1,4 @@
-wave = load_vcd("verilator.vcd", 1, 'ps')
+wave = open("verilator.vcd", 1, 'ps')
 
 allow_list = {
 	[[.*_reg]]

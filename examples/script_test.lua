@@ -1,4 +1,4 @@
-wave = load_vcd("core.vcd", 100, "ps")
+wave = open("core.vcd", 100, "ps")
 
 -- this does nothing
 -- On initial file load, data and terminal dimensions are not set until first render pass. That happens

@@ -1,5 +1,5 @@
 function load_it(wave)
-	wave = load('2Mx2k.hello', 1, 'ps')
+	wave = open('2Mx2k.hello', 1, 'ps')
 
 	signals = {
 		'signal_4747',

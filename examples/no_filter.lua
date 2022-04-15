@@ -1,2 +1,2 @@
-wave = load_vcd("core.vcd", 100, "ps")
+wave = open("core.vcd", 100, "ps")
 

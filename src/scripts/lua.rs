@@ -13,7 +13,7 @@ use mlua::{
 };
 use std::fs::File;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path,PathBuf};
 use std::stringify;
 
 macro_rules! add_global_function {
@@ -33,8 +33,10 @@ impl LuaInterpreter {
         Self::install_plugins(&lua, plugin_map)?;
         Self::configure_lua_path(&lua, config)?;
 
-        add_global_function!(lua, load_vcd);
-        add_global_function!(lua, load);
+        let work_dir = std::env::current_dir()?;
+        Self::set_working_directory(&lua, &work_dir)?;
+
+        add_global_function!(lua, open);
         add_global_function!(lua, filter_signals);
         add_global_function!(lua, grep);
         add_global_function!(lua, ignore);
@@ -60,6 +62,16 @@ impl LuaInterpreter {
         Ok(())
     }
 
+    fn set_working_directory(lua: &Lua, work_dir: impl AsRef<Path>) -> Result<()> {
+        let wd_str: String = work_dir.as_ref()
+            .to_str()
+            .ok_or(Error::Internal(format!("Can not represent '{}' as string for Lua",
+                        work_dir.as_ref().display())))?
+            .into();
+        lua.globals().set("_cwd", wd_str)?;
+        Ok(())
+    }
+
     fn configure_lua_path(lua: &Lua, config: impl AsRef<Config>) -> Result<()> {
         let lua_path = config.as_ref().get_script_dir()
             .and_then(|script_path| script_path.to_str())
@@ -76,6 +88,16 @@ impl LuaInterpreter {
     }
 
     pub fn run_file(&mut self, state: ScriptState, filename: impl AsRef<str>) -> Result<ScriptState> {
+        // set working directory
+        let path = PathBuf::from(filename.as_ref());
+        let dir = path.canonicalize()?
+            .parent()
+            .ok_or(Error::NotFound(format!("'{}': can not determine parent directory",
+                        filename.as_ref())))?
+            .to_path_buf();
+        Self::set_working_directory(&self.lua, dir)?;
+
+        // load and run file
         let mut file = File::open(filename.as_ref())?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;

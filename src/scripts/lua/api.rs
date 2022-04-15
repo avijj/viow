@@ -1,34 +1,38 @@
 use super::*;
-use crate::pipeline::filter;
+use crate::pipeline::{SrcBox, filter};
 use crate::load::plugin::PluggedLoader;
 
-pub(super) fn load_vcd<'callback>(_lua: &'callback Lua, args: (String, u64, String)) -> mlua::Result<Wave>
-{
+pub(super) fn open<'callback>(lua: &'callback Lua, args: (String, u64, String)) -> mlua::Result<Wave> {
     let (filename, period, timeunit) = args;
-    let cycle_time = SimTime::new(period, SimTimeUnit::from_string(timeunit)?);
-    let loader = Box::new(VcdLoader::new(PathBuf::from(filename), Some(cycle_time))?);
-    let new_wave = Wave::load(loader)?;
-    Ok(new_wave)
-}
 
-pub(super) fn load<'callback>(lua: &'callback Lua, args: (String, u64, String)) -> mlua::Result<Wave> {
     let plugins: Plugins = lua.globals().get("_plugins")?;
-    let (filename, period, timeunit) = args;
-    let suffix = filename.split('.').last()
-        .ok_or(Error::UnknownFileFormat(filename.clone()))?;
+    let work_dir: String = lua.globals().get("_cwd")?;
+
+    let mut path = PathBuf::from(work_dir);
+    path.push(filename);
+    let suffix = path.extension()
+        .map(|ext| ext.to_string_lossy().to_string())
+        .ok_or(Error::UnknownFileFormat(path.to_string_lossy().to_string()))?;
+    //let suffix = filename.split('.').last()
+        //.ok_or(Error::UnknownFileFormat(filename.clone()))?;
+
+    let cycle_time = SimTime::new(period, SimTimeUnit::from_string(timeunit)?);
+    let loader: SrcBox;
 
     if suffix == "vcd" {
-        load_vcd(lua, (filename, period, timeunit))
+        //load_vcd(lua, (path, period, timeunit))
+        loader = Box::new(VcdLoader::new(path, Some(cycle_time))?);
     } else {
-        if let Some(plugin) = plugins.plugin_map.get(suffix) {
-            let cycle_time = SimTime::new(period, SimTimeUnit::from_string(timeunit)?);
-            let loader = Box::new(PluggedLoader::new(plugin.clone(), filename.as_str(), cycle_time)?);
-            let new_wave = Wave::load(loader)?;
-            Ok(new_wave)
+        if let Some(plugin) = plugins.plugin_map.get(&suffix) {
+            let path_str = path.to_string_lossy();
+            loader = Box::new(PluggedLoader::new(plugin.clone(), path_str, cycle_time)?);
         } else {
-            Err(Error::UnknownFileFormat(filename.clone()).into())
+            return Err(Error::UnknownFileFormat(path.to_string_lossy().to_string()).into());
         }
     }
+
+    let new_wave = Wave::load(loader)?;
+    Ok(new_wave)
 }
 
 pub(super) fn filter_signals<'callback>(_lua: &'callback Lua, args: (Wave, Vec<String>)) -> mlua::Result<Wave>
