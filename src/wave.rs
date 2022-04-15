@@ -1,6 +1,8 @@
 mod cache;
+mod pipeline_cid;
 
 use cache::*;
+use pipeline_cid::PipelineCId;
 use crate::error::*;
 use crate::formatting::{WaveFormat,format_value};
 use crate::data::*;
@@ -25,7 +27,7 @@ pub struct Wave
 {
     formatters: Vec<WaveFormat>,
     names: Vec<String>,
-    pipe: Pipeline,
+    pipe: PipelineCId,
     config: PipelineConfig,
     num_signals: usize,
     cache: Cache,
@@ -33,12 +35,12 @@ pub struct Wave
 
 impl Wave {
     pub fn load(source: SrcBox/*, config: &Config*/) -> Result<Self> {
-        let pipe = Pipeline::new(source);
+        let pipe = PipelineCId::new(source);
         let config = PipelineConfig::default();
         Self::load_from_pipe(pipe, config)
     }
 
-    fn load_from_pipe(pipe: Stage<String, usize, Integer>, config: PipelineConfig) -> Result<Self> {
+    fn load_from_pipe(pipe: PipelineCId, config: PipelineConfig) -> Result<Self> {
         let signals = pipe.query_signals()?;
         let num_signals = signals.len();
         let mut ids = Vec::with_capacity(signals.len());

@@ -53,7 +53,7 @@ impl Cache {
         }
     }
 
-    fn load_tile(&self, pipe: &mut Pipeline, index: &CacheIndex) -> CacheTile {
+    fn load_tile(&self, pipe: &mut PipelineCId, index: &CacheIndex) -> CacheTile {
         let start_cycle = index.y * self.cycles_per_tile;
         let end_cycle = std::cmp::min(
             (index.y + 1) * self.cycles_per_tile,
@@ -78,7 +78,7 @@ impl Cache {
         }
     }
 
-    pub(super) fn get(&mut self, pipe: &mut Pipeline, id: usize, cycle_range: Range<usize>) -> Array1<Integer> {
+    pub(super) fn get(&mut self, pipe: &mut PipelineCId, id: usize, cycle_range: Range<usize>) -> Array1<Integer> {
         debug_assert!(id < self.num_signals);
         debug_assert!(cycle_range.end <= self.num_cycles);
 
@@ -152,7 +152,7 @@ mod test {
         const CYC_PER_TILE: usize = 23;
 
         let loader = Box::new(VcdLoader::new("examples/verilator.vcd", Some(SimTime::from_ps(1))).unwrap());
-        let mut pipe = Pipeline::new(loader);
+        let mut pipe = PipelineCId::new(loader);
         let num_signals = pipe.query_signals().unwrap().len();
         let num_cycles = pipe.query_cycle_count();
         let mut cache = Cache::new(CAPACITY, SIG_PER_TILE, CYC_PER_TILE, num_signals, num_cycles);
