@@ -11,13 +11,13 @@ pub struct SignalList {
 
 impl SignalList {
     pub fn new(signals: impl IntoIterator<Item = String>) -> Self {
-        let mut hash_set = HashMap::new();
+        let mut hash_map = HashMap::new();
 
         for (i, signal) in signals.into_iter().enumerate() {
-            hash_set.insert(signal, i);
+            hash_map.insert(signal, i);
         }
 
-        Self { signals: hash_set, enabled: true }
+        Self { signals: hash_map, enabled: true }
     }
 }
 
